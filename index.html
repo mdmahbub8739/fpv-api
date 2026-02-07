@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#141414">
+    <title>MultiFlix - Stream</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --netflix-red: #E50914;
+            --netflix-black: #141414;
+            --netflix-dark-gray: #181818;
+            --netflix-light-gray: #b3b3b3;
+        }
+
+        body {
+            background-color: var(--netflix-black);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* --- GOOGLE STYLE LOADER (Shape Shifting) --- */
+        .loader-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 50px;
+        }
+        .google-loader {
+            animation: rotate 2s linear infinite;
+            height: 40px;
+            width: 40px;
+        }
+        .google-loader circle {
+            stroke: #E50914;
+            stroke-width: 4;
+            stroke-dasharray: 1, 200;
+            stroke-dashoffset: 0;
+            animation: dash 1.5s ease-in-out infinite, color 6s ease-in-out infinite;
+            stroke-linecap: round;
+            fill: none;
+        }
+        @keyframes rotate { 100% { transform: rotate(360deg); } }
+        @keyframes dash {
+            0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+            50% { stroke-dasharray: 89, 200; stroke-dashoffset: -35px; }
+            100% { stroke-dasharray: 89, 200; stroke-dashoffset: -124px; }
+        }
+        @keyframes color {
+            100%, 0% { stroke: #E50914; } 
+            40% { stroke: #4285F4; } 
+            66% { stroke: #F4B400; } 
+            80%, 90% { stroke: #0F9D58; } 
+        }
+
+        /* --- SKELETON LOADER (Netflix Style) --- */
+        .skeleton {
+            background: #262626;
+            background-image: linear-gradient(to right, #262626 0%, #333 20%, #262626 40%, #262626 100%);
+            background-repeat: no-repeat;
+            background-size: 800px 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: -468px 0; }
+            100% { background-position: 468px 0; }
+        }
+
+        /* Card Hover Effects */
+        .movie-card {
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), z-index 0.3s;
+            transform-origin: center center;
+            z-index: 10;
+            cursor: pointer;
+            position: relative;
+        }
+        .movie-card:hover {
+            transform: scale(1.05);
+            z-index: 50;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.7);
+        }
+        .movie-card img {
+            border-radius: 4px;
+        }
+
+        /* Hero Section */
+        .hero-gradient {
+            background: linear-gradient(to top, #141414 0%, transparent 60%, rgba(0,0,0,0.4) 100%);
+        }
+
+        /* Modal Transitions */
+        .modal-enter { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Custom Scrollbar for Modal */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #181818; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #555; border-radius: 10px; }
+
+        /* Nav Glass */
+        .nav-glass {
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#E50914',
+                        dark: '#141414',
+                        surface: '#181818',
+                        graytext: '#b3b3b3'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-dark text-white selection:bg-brand selection:text-white flex flex-col min-h-screen">
+
+    <!-- SPLASH SCREEN -->
+    <div id="app-splash" class="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center transition-opacity duration-500">
+        <h1 class="text-5xl font-black tracking-tighter text-brand mb-4">MULTI<span class="text-white">FLIX</span></h1>
+        <div class="loader-container">
+            <svg class="google-loader" viewBox="25 25 50 50">
+                <circle cx="50" cy="50" r="20"></circle>
+            </svg>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header id="main-header" class="fixed top-0 w-full z-50 transition-all duration-300 nav-glass">
+        <div class="flex items-center justify-between px-4 py-4 md:px-12">
+            <div class="flex items-center gap-8">
+                <div class="cursor-pointer" onclick="window.location.reload()">
+                    <h1 class="text-2xl md:text-3xl font-black tracking-tighter text-brand">MULTI<span class="text-white">FLIX</span></h1>
+                </div>
+                <nav class="hidden md:flex gap-5 text-sm font-medium text-graytext">
+                    <button class="text-white font-bold">Home</button>
+                    <button class="hover:text-white transition">Series</button>
+                    <button class="hover:text-white transition">Movies</button>
+                    <button class="hover:text-white transition">New & Popular</button>
+                </nav>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="relative group">
+                    <i class="ri-search-line text-xl cursor-pointer text-white"></i>
+                    <input type="text" id="searchInput" placeholder="Search..." 
+                        class="absolute right-0 top-[-5px] w-0 group-hover:w-60 focus:w-60 transition-all duration-300 bg-black/80 border border-white/20 rounded px-3 py-1 text-sm outline-none focus:border-brand opacity-0 group-hover:opacity-100 focus:opacity-100">
+                </div>
+                <img src="https://ui-avatars.com/api/?name=User&background=333&color=fff" class="w-8 h-8 rounded-md cursor-pointer border border-white/20">
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow pt-20">
+        
+        <!-- Hero Section (Dynamic) -->
+        <div id="hero-section" class="relative w-full h-[60vh] md:h-[80vh] bg-surface overflow-hidden mb-8 hidden">
+            <img id="hero-img" src="" class="w-full h-full object-cover opacity-60">
+            <div class="absolute inset-0 hero-gradient"></div>
+            <div class="absolute bottom-[20%] left-4 md:left-12 max-w-2xl z-20">
+                <div class="text-brand font-bold tracking-widest text-xs mb-2 uppercase flex items-center gap-2">
+                    <i class="ri-fire-fill text-xl"></i> Featured
+                </div>
+                <h1 id="hero-title" class="text-3xl md:text-6xl font-black mb-4 leading-tight drop-shadow-lg">Loading...</h1>
+                <div class="flex gap-3">
+                    <button id="hero-play-btn" class="bg-white text-black px-6 py-2.5 rounded font-bold flex items-center gap-2 hover:bg-opacity-80 transition">
+                        <i class="ri-play-fill text-2xl"></i> Play
+                    </button>
+                    <button class="bg-gray-500/40 backdrop-blur-md text-white px-6 py-2.5 rounded font-bold flex items-center gap-2 hover:bg-gray-500/60 transition">
+                        <i class="ri-information-line text-2xl"></i> More Info
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="px-4 md:px-12 pb-10">
+            <h2 id="section-title" class="text-xl font-bold mb-4 text-white">Trending Now</h2>
+            <div id="grid-container" class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4"></div>
+            
+            <!-- Loader Sentinel -->
+            <div id="loading-sentinel" class="py-12 flex justify-center w-full">
+                <div class="loader-container">
+                    <svg class="google-loader" viewBox="25 25 50 50">
+                        <circle cx="50" cy="50" r="20"></circle>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- DETAILS MODAL (Immersive Player) -->
+    <div id="details-modal" class="fixed inset-0 z-[100] bg-black hidden flex flex-col overflow-y-auto custom-scroll modal-enter pb-safe">
+        <!-- Close Button (Top Right) -->
+        <button onclick="app.closeModal()" class="fixed top-4 right-4 z-[110] bg-black/50 backdrop-blur-md p-2 rounded-full hover:bg-white hover:text-black transition border border-white/20">
+            <i class="ri-close-line text-2xl"></i>
+        </button>
+
+        <!-- Video Area -->
+        <div class="w-full bg-black sticky top-0 z-50 shadow-2xl">
+            <div class="relative w-full aspect-video md:h-[70vh] flex items-center justify-center bg-[#000]">
+                <div id="video-placeholder" class="absolute inset-0 w-full h-full">
+                    <img id="modal-backdrop" src="" class="w-full h-full object-cover opacity-40">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div class="text-center">
+                            <h1 id="modal-title-overlay" class="text-3xl md:text-5xl font-black mb-4 drop-shadow-lg">Title</h1>
+                            <p class="text-gray-400 text-sm animate-pulse">Auto-selecting best server...</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Iframe Container -->
+                <iframe id="main-player" class="absolute inset-0 w-full h-full hidden" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+            </div>
+            
+            <!-- CONTROL BAR (Under Video - Prev/Next) -->
+            <div id="episode-controls" class="hidden w-full bg-surface border-b border-white/10 p-3 flex justify-between items-center gap-4">
+                <div class="flex gap-2 w-full md:w-auto md:justify-center mx-auto">
+                    <button onclick="app.playPrevEpisode()" id="prev-btn" class="flex-1 md:flex-none bg-white/10 hover:bg-brand text-white px-6 py-2 rounded font-bold transition flex items-center justify-center gap-2">
+                        <i class="ri-skip-back-fill"></i> Prev
+                    </button>
+                    <button onclick="app.playNextEpisode()" id="next-btn" class="flex-1 md:flex-none bg-white/10 hover:bg-brand text-white px-6 py-2 rounded font-bold transition flex items-center justify-center gap-2">
+                        Next <i class="ri-skip-forward-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Area -->
+        <div class="max-w-7xl mx-auto w-full px-4 py-8 md:px-12 pb-32"> <!-- Added extra padding-bottom for the Home button -->
+            
+            <!-- Top Metadata -->
+            <div class="mb-6">
+                <h1 id="modal-title" class="text-2xl md:text-4xl font-black mb-2">Title</h1>
+                <div class="flex items-center gap-3 text-sm text-graytext mb-4">
+                    <span class="text-green-500 font-bold">98% Match</span>
+                    <span id="modal-quality" class="border border-gray-600 px-1 rounded text-xs">HD</span>
+                    <span id="modal-rating" class="text-yellow-500 font-bold"></span>
+                </div>
+                <p id="modal-desc" class="text-gray-300 leading-relaxed text-sm md:text-base max-w-3xl">Loading details...</p>
+                
+                <!-- Logs -->
+                <div id="extraction-log" class="mt-4 p-2 bg-surface rounded text-[10px] font-mono text-gray-500 h-10 overflow-hidden border border-white/5 opacity-50 hover:opacity-100 transition">
+                    <div class="text-brand">> System Ready.</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Main Content Column -->
+                <div class="md:col-span-2 space-y-8">
+                    
+                    <!-- Servers -->
+                    <div class="bg-surface p-4 rounded-xl border border-white/5">
+                        <h3 class="text-white font-bold mb-3 flex items-center gap-2 text-sm uppercase tracking-wider"><i class="ri-server-line text-brand"></i> Select Source</h3>
+                        <div id="server-list" class="flex flex-wrap gap-2">
+                            <span class="text-xs text-gray-500">Loading servers...</span>
+                        </div>
+                    </div>
+
+                    <!-- Episodes -->
+                    <div id="episode-section" class="hidden">
+                        <h3 class="text-white font-bold mb-3 flex items-center gap-2 text-sm uppercase tracking-wider"><i class="ri-film-line text-brand"></i> Episodes</h3>
+                        <div id="episode-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-96 overflow-y-auto custom-scroll pr-1">
+                            <!-- Episodes -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Sidebar -->
+                <div class="hidden md:block"></div>
+            </div>
+
+            <!-- RECOMMENDATIONS (Always at Bottom) -->
+            <div class="mt-12 border-t border-white/10 pt-8">
+                <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-2">More Like This</h3>
+                <div id="recommendation-grid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                    <!-- Skeletons will appear here -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- HOME BUTTON (Fixed at Bottom Center) -->
+        <div class="fixed bottom-6 left-0 right-0 z-[120] flex justify-center pointer-events-none">
+            <button onclick="app.closeModal()" class="pointer-events-auto bg-black/90 backdrop-blur-md text-white px-8 py-3 rounded-full border border-white/20 shadow-2xl flex items-center gap-2 font-bold hover:bg-brand hover:border-brand hover:scale-105 transition duration-300 group">
+                <i class="ri-home-5-fill text-xl group-hover:animate-bounce"></i> 
+                <span>Home</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        // --- PROXY ROTATION SYSTEM ---
+        const PROXIES = [
+            "https://corsproxy.io/?",
+            "https://api.allorigins.win/raw?url=",
+            "https://thingproxy.freeboard.io/fetch/",
+            "https://api.codetabs.com/v1/proxy?quest="
+        ];
+
+        const CONFIG = {
+            domainsUrl: "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json"
+        };
+
+        const state = {
+            baseUrl: "https://multimovies.cheap", // Fallback
+            page: 1,
+            fetching: false,
+            hasMore: true,
+            searchMode: false,
+            searchQuery: ""
+        };
+
+        const app = {
+            currentEpisodeIndex: -1,
+            allEpisodes: [],
+
+            init: async () => {
+                // Splash Removal
+                setTimeout(() => {
+                    document.getElementById('app-splash').style.opacity = '0';
+                    setTimeout(() => document.getElementById('app-splash').remove(), 500);
+                }, 1000);
+
+                // Fetch Domain Config
+                try {
+                    const dataStr = await app.fetchWithFallback(CONFIG.domainsUrl);
+                    if(dataStr) {
+                        const data = JSON.parse(dataStr);
+                        if(data?.MultiMovies) state.baseUrl = data.MultiMovies;
+                    }
+                } catch(e) { console.log("Config load failed, using default"); }
+
+                // Infinite Scroll
+                const observer = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting && !state.fetching && state.hasMore) app.fetchFeed();
+                }, { rootMargin: "200px" });
+                observer.observe(document.getElementById('loading-sentinel'));
+
+                // Search
+                document.getElementById('searchInput').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') app.doSearch(e.target.value);
+                });
+
+                // Initial Load
+                app.fetchFeed();
+            },
+
+            // --- ROBUST FETCHING WITH PROXY ROTATION ---
+            fetchWithFallback: async (url) => {
+                for (const proxy of PROXIES) {
+                    try {
+                        const res = await fetch(proxy + encodeURIComponent(url));
+                        if (res.ok) return await res.text();
+                    } catch (e) {
+                        console.warn(`Proxy ${proxy} failed for ${url}`);
+                    }
+                }
+                return null;
+            },
+
+            getHtml: async (url) => {
+                const txt = await app.fetchWithFallback(url);
+                if (!txt) return null;
+                return new DOMParser().parseFromString(txt, 'text/html');
+            },
+
+            fetchFeed: async () => {
+                state.fetching = true;
+                
+                // Show Skeletons
+                const grid = document.getElementById('grid-container');
+                const skeletonHTML = Array(6).fill('<div class="skeleton aspect-[2/3]"></div>').join('');
+                if(state.page > 1) grid.insertAdjacentHTML('beforeend', `<div id="temp-skeletons" class="contents">${skeletonHTML}</div>`);
+                
+                let url = state.searchMode 
+                    ? `${state.baseUrl}/page/${state.page}/?s=${encodeURIComponent(state.searchQuery)}`
+                    : (state.page === 1 ? `${state.baseUrl}/trending/` : `${state.baseUrl}/trending/page/${state.page}/`);
+
+                try {
+                    const doc = await app.getHtml(url);
+                    if(!doc) throw new Error("No doc");
+                    
+                    let items = doc.querySelectorAll("#archive-content > article, div.items > article, div.result-item");
+                    
+                    const temps = document.getElementById('temp-skeletons');
+                    if(temps) temps.remove();
+                    
+                    if (items.length > 0) {
+                        if (state.page === 1 && !state.searchMode) app.setHero(items[0]);
+                        app.renderGrid(items);
+                        state.page++;
+                    } else {
+                        state.hasMore = false;
+                        document.getElementById('loading-sentinel').style.display = 'none';
+                    }
+                } catch (e) {
+                    console.error(e);
+                    const temps = document.getElementById('temp-skeletons');
+                    if(temps) temps.remove();
+                } finally {
+                    state.fetching = false;
+                }
+            },
+
+            setHero: (el) => {
+                const title = el.querySelector(".data > h3 > a, .title > a")?.textContent.trim();
+                const img = el.querySelector("img")?.getAttribute("data-src") || el.querySelector("img")?.getAttribute("src");
+                const href = el.querySelector("a")?.getAttribute("href");
+
+                if (title && img) {
+                    const hero = document.getElementById('hero-section');
+                    hero.classList.remove('hidden');
+                    document.getElementById('hero-img').src = img;
+                    document.getElementById('hero-title').innerText = title;
+                    document.getElementById('hero-play-btn').onclick = () => app.openDetails(href);
+                }
+            },
+
+            renderGrid: (nodes) => {
+                const grid = document.getElementById('grid-container');
+                nodes.forEach(el => {
+                    const titleEl = el.querySelector(".data > h3 > a, .title > a");
+                    const title = titleEl?.textContent.trim();
+                    const href = titleEl?.getAttribute("href");
+                    const img = el.querySelector("img")?.getAttribute("data-src") || el.querySelector("img")?.getAttribute("src");
+                    const quality = el.querySelector(".mepo > span")?.textContent || "HD";
+
+                    if (title && href) {
+                        const div = document.createElement('div');
+                        div.className = "movie-card relative aspect-[2/3] bg-surface rounded overflow-hidden group";
+                        div.innerHTML = `
+                            <img src="${img || ''}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
+                                <h3 class="text-xs font-bold text-white leading-tight drop-shadow-md">${title}</h3>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[9px] text-green-400 font-bold">95% Match</span>
+                                    <span class="text-[9px] border border-gray-400 px-1 rounded text-gray-200">${quality}</span>
+                                </div>
+                            </div>
+                        `;
+                        div.onclick = () => app.openDetails(href);
+                        grid.appendChild(div);
+                    }
+                });
+            },
+
+            openDetails: async (url) => {
+                const modal = document.getElementById('details-modal');
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                
+                // Reset State
+                document.getElementById('main-player').classList.add('hidden');
+                document.getElementById('main-player').src = "";
+                document.getElementById('video-placeholder').classList.remove('hidden');
+                document.getElementById('server-list').innerHTML = '<span class="text-xs text-brand animate-pulse">Scanning servers...</span>';
+                document.getElementById('episode-list').innerHTML = '';
+                document.getElementById('recommendation-grid').innerHTML = '';
+                document.getElementById('modal-title-overlay').innerText = 'Loading...';
+                document.getElementById('episode-controls').classList.add('hidden');
+                
+                app.log("Fetching metadata...");
+                app.currentEpisodeIndex = -1;
+                app.allEpisodes = [];
+
+                // Fetch Recommendations (Parallel)
+                app.fetchRecommendations();
+
+                const doc = await app.getHtml(url);
+                if (!doc) return;
+
+                const title = doc.querySelector("div.sheader > div.data > h1")?.textContent.trim();
+                const poster = doc.querySelector("div.g-item a")?.getAttribute("href") || doc.querySelector("div.poster img")?.getAttribute("src");
+                const plot = doc.querySelector("#info div.wp-content p")?.textContent.trim();
+                const rating = doc.querySelector(".dt_rating_vgs")?.textContent.trim() || "N/A";
+
+                document.getElementById('modal-title').innerText = title;
+                document.getElementById('modal-title-overlay').innerText = title;
+                document.getElementById('modal-desc').innerText = plot || "No description available.";
+                document.getElementById('modal-backdrop').src = poster;
+                document.getElementById('modal-rating').innerText = rating;
+
+                const seasons = doc.querySelectorAll("#seasons ul.episodios");
+                if (seasons.length > 0) {
+                    app.renderEpisodes(seasons);
+                } else {
+                    document.getElementById('episode-section').classList.add('hidden');
+                    app.loadSources(url, doc);
+                }
+            },
+
+            fetchRecommendations: async () => {
+                const grid = document.getElementById('recommendation-grid');
+                grid.innerHTML = Array(6).fill('<div class="skeleton aspect-[2/3] rounded"></div>').join('');
+
+                try {
+                    const randomPage = Math.floor(Math.random() * 5) + 1;
+                    const url = `${state.baseUrl}/page/${randomPage}/`;
+                    
+                    const doc = await app.getHtml(url);
+                    if(!doc) return;
+
+                    let items = doc.querySelectorAll("#archive-content > article, div.items > article, div.result-item");
+                    grid.innerHTML = '';
+                    
+                    Array.from(items).slice(0, 12).forEach(el => {
+                        const titleEl = el.querySelector(".data > h3 > a, .title > a");
+                        const title = titleEl?.textContent.trim();
+                        const href = titleEl?.getAttribute("href");
+                        const img = el.querySelector("img")?.getAttribute("data-src") || el.querySelector("img")?.getAttribute("src");
+                        const quality = el.querySelector(".mepo > span")?.textContent || "HD";
+
+                        if (title && href) {
+                            const div = document.createElement('div');
+                            div.className = "movie-card relative aspect-[2/3] bg-surface rounded overflow-hidden group";
+                            div.innerHTML = `
+                                <img src="${img || ''}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-end">
+                                    <h3 class="text-[10px] md:text-xs font-bold text-white leading-tight drop-shadow-md line-clamp-2">${title}</h3>
+                                </div>
+                            `;
+                            div.onclick = () => {
+                                document.getElementById('details-modal').scrollTo({ top: 0, behavior: 'smooth' });
+                                app.openDetails(href);
+                            };
+                            grid.appendChild(div);
+                        }
+                    });
+
+                } catch(e) {
+                    grid.innerHTML = '';
+                }
+            },
+
+            renderEpisodes: (seasons) => {
+                const section = document.getElementById('episode-section');
+                const list = document.getElementById('episode-list');
+                section.classList.remove('hidden');
+                list.innerHTML = '';
+                document.getElementById('server-list').innerHTML = '<span class="text-xs text-gray-500">Select an episode to load servers.</span>';
+
+                let globalIndex = 0;
+                app.allEpisodes = [];
+
+                seasons.forEach((ul, sIdx) => {
+                    ul.querySelectorAll("li").forEach((li, eIdx) => {
+                        const link = li.querySelector("a")?.getAttribute("href");
+                        if (link) {
+                            const title = `S${sIdx+1}:E${eIdx+1}`;
+                            app.allEpisodes.push({ link, title, index: globalIndex });
+                            
+                            const btn = document.createElement('button');
+                            btn.className = "text-xs bg-white/5 hover:bg-brand hover:text-white p-3 rounded text-center border border-white/5 transition-all";
+                            btn.innerText = title;
+                            btn.dataset.index = globalIndex;
+                            btn.onclick = () => app.playEpisodeByIndex(btn.dataset.index);
+                            list.appendChild(btn);
+                            globalIndex++;
+                        }
+                    });
+                });
+            },
+
+            playEpisodeByIndex: (index) => {
+                index = parseInt(index);
+                if(index < 0 || index >= app.allEpisodes.length) return;
+                
+                app.currentEpisodeIndex = index;
+                const ep = app.allEpisodes[index];
+                
+                document.querySelectorAll('#episode-list button').forEach(b => {
+                    b.classList.remove('bg-brand');
+                    if(parseInt(b.dataset.index) === index) b.classList.add('bg-brand');
+                });
+
+                const controls = document.getElementById('episode-controls');
+                controls.classList.remove('hidden');
+                
+                const prevBtn = document.getElementById('prev-btn');
+                const nextBtn = document.getElementById('next-btn');
+                
+                prevBtn.disabled = index === 0;
+                nextBtn.disabled = index === app.allEpisodes.length - 1;
+                
+                prevBtn.classList.toggle('opacity-50', index === 0);
+                nextBtn.classList.toggle('opacity-50', index === app.allEpisodes.length - 1);
+
+                app.loadSources(ep.link);
+            },
+
+            playNextEpisode: () => { app.playEpisodeByIndex(app.currentEpisodeIndex + 1); },
+            playPrevEpisode: () => { app.playEpisodeByIndex(app.currentEpisodeIndex - 1); },
+
+            loadSources: async (url, preDoc = null) => {
+                const list = document.getElementById('server-list');
+                list.innerHTML = '<span class="text-xs text-brand animate-pulse">Fetching links...</span>';
+                
+                let doc = preDoc || await app.getHtml(url);
+                if(!doc) { list.innerHTML = '<span class="text-xs text-red-500">Failed to load.</span>'; return; }
+                
+                const opts = doc.querySelectorAll("ul#playeroptionsul li");
+                list.innerHTML = '';
+
+                if(opts.length === 0) {
+                    list.innerHTML = '<span class="text-xs text-red-500">No servers found.</span>';
+                    return;
+                }
+
+                opts.forEach((opt, idx) => {
+                    const id = opt.getAttribute("data-post");
+                    const name = opt.getAttribute("data-nume");
+                    const type = opt.getAttribute("data-type");
+
+                    if (id) {
+                        const btn = document.createElement('button');
+                        btn.className = "bg-white/10 hover:bg-white hover:text-black text-white px-4 py-2 rounded text-xs font-bold transition-all border border-white/10 flex items-center gap-2";
+                        btn.innerHTML = `<i class="ri-play-circle-line"></i> Server ${idx+1} (${name})`;
+                        btn.onclick = () => app.playVideo(id, name, type);
+                        list.appendChild(btn);
+                    }
+                });
+                
+                // Auto Play First Server
+                if(opts.length > 0) {
+                    app.log("Auto-playing Server 1...");
+                    const first = opts[0];
+                    app.playVideo(first.getAttribute("data-post"), first.getAttribute("data-nume"), first.getAttribute("data-type"));
+                }
+            },
+
+            playVideo: async (id, name, type) => {
+                app.log(`Loading ${name}...`);
+                document.getElementById('modal-title-overlay').innerText = "Loading Stream...";
+                
+                const formData = new URLSearchParams();
+                formData.append('action', 'doo_player_ajax');
+                formData.append('post', id);
+                formData.append('nume', name);
+                formData.append('type', type);
+
+                try {
+                    const targetUrl = `${state.baseUrl}/wp-admin/admin-ajax.php`;
+                    const res = await fetch(PROXIES[0] + encodeURIComponent(targetUrl), {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                        body: formData
+                    });
+                    
+                    const json = await res.json();
+                    
+                    if (json.embed_url) {
+                        let link = json.embed_url;
+                        const match = link.match(/src="([^"]+)"/);
+                        if (match) link = match[1];
+                        link = link.replace(/\\/g, '');
+
+                        const iframe = document.getElementById('main-player');
+                        const placeholder = document.getElementById('video-placeholder');
+                        
+                        iframe.src = link;
+                        placeholder.classList.add('hidden');
+                        iframe.classList.remove('hidden');
+                        
+                        app.log(`Playing: ${name}`, 'success');
+                    } else {
+                        app.log("Stream failed.", 'error');
+                    }
+                } catch(e) {
+                    app.log("Network error / CORS on POST.", 'error');
+                    console.error(e);
+                }
+            },
+
+            doSearch: (q) => {
+                if(!q) return;
+                state.searchMode = true;
+                state.searchQuery = q;
+                state.page = 1;
+                state.hasMore = true;
+                document.getElementById('grid-container').innerHTML = '';
+                document.getElementById('section-title').innerText = `Search: "${q}"`;
+                document.getElementById('hero-section').classList.add('hidden');
+                app.fetchFeed();
+            },
+
+            closeModal: () => {
+                document.getElementById('details-modal').classList.add('hidden');
+                document.getElementById('main-player').src = "";
+                document.getElementById('main-player').classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            },
+
+            log: (msg, type) => {
+                const div = document.getElementById('extraction-log');
+                div.innerHTML = `<div class="${type === 'error' ? 'text-red-400' : 'text-green-400'}">> ${msg}</div>`;
+            }
+        };
+
+        app.init();
+    </script>
+</body>
+</html>
