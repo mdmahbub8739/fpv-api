@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MultiFlix Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#E50914',
+                        base: '#000000',
+                        surface: '#181818',
+                        highlight: '#2F2F2F'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+        }
+
+        .admin-page {
+            display: none;
+        }
+
+        .admin-page.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .suggestions-box {
+            max-height: 300px;
+            overflow-y: auto;
+            position: absolute;
+            width: 100%;
+            z-index: 50;
+            background: #1F1F1F;
+            border: 1px solid #333;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #181818;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #E50914;
+        }
+
+        .admin-card-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(2px);
+        }
+
+        .library-tab {
+            border-bottom: 2px solid transparent;
+        }
+
+        .library-tab.active {
+            color: #E50914;
+            border-bottom-color: #E50914;
+        }
+
+        .loader {
+            border: 2px solid #333;
+            border-top: 2px solid #E50914;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Modal Styles */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: #E50914;
+            cursor: pointer;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased h-screen overflow-hidden">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center bg-base relative p-4">
+        <div class="absolute -top-20 -left-20 w-96 h-96 bg-brand/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="w-full max-w-md bg-surface border border-highlight p-8 rounded-2xl shadow-2xl relative z-10">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-extrabold tracking-tighter text-brand">MULTI<span class="text-white">FLIX</span></h1>
+                <p class="text-gray-500 text-sm uppercase tracking-widest font-bold">Admin Portal 2.4</p>
+            </div>
+            <form id="admin-login-form" class="space-y-4">
+                <input type="email" id="admin-email" class="w-full bg-highlight text-white rounded-lg p-3 outline-none focus:ring-1 focus:ring-brand" placeholder="Admin Email" required>
+                <input type="password" id="admin-password" class="w-full bg-highlight text-white rounded-lg p-3 outline-none focus:ring-1 focus:ring-brand" placeholder="Password" required>
+                <button type="submit" class="w-full bg-brand hover:bg-red-700 text-white rounded-lg p-3 font-bold transition">Access Dashboard</button>
+                <p id="admin-auth-error" class="text-brand mt-2 text-center text-sm"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN PANEL -->
+    <div id="admin-panel" class="hidden h-screen flex flex-col md:flex-row bg-base">
+
+        <!-- MOBILE OVERLAY BACKDROP -->
+        <div id="mobile-menu-overlay" onclick="toggleMobileMenu('close')" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity"></div>
+
+        <aside id="sidebar" class="w-64 bg-surface border-r border-highlight flex flex-col hidden md:flex transition-transform duration-300">
+            <div class="p-6 flex justify-center border-b border-highlight">
+                <h1 class="text-2xl font-extrabold tracking-tighter text-brand">MULTI<span class="text-white">FLIX</span></h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <button onclick="showAdminPage('dashboard'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-dashboard-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Dashboard</span></button>
+
+                <div class="my-2 border-t border-highlight"></div>
+
+                <button onclick="showAdminPage('reports'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group">
+                    <i class="ri-alarm-warning-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Reports</span>
+                    <span id="report-badge" class="ml-auto bg-yellow-600 text-white text-[10px] px-2 rounded-full font-bold hidden">0</span>
+                </button>
+
+                <button onclick="showAdminPage('requests'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-question-answer-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Requests</span><span id="req-badge" class="ml-auto bg-brand text-white text-[10px] px-2 rounded-full font-bold hidden">0</span></button>
+                <button onclick="showAdminPage('updates'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-notification-badge-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Updates</span><span id="update-badge" class="ml-auto bg-blue-500 text-white text-[10px] px-2 rounded-full font-bold hidden">0</span></button>
+
+                <div class="my-2 border-t border-highlight"></div>
+
+                <button onclick="showAdminPage('library'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-book-3-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Content Library</span></button>
+
+                <button onclick="showAdminPage('movies'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-movie-2-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Add Movies</span></button>
+                <button onclick="showAdminPage('series'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-tv-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Add TV Series</span></button>
+                <button onclick="showAdminPage('collections'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-folder-add-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Collections</span></button>
+
+                <div class="my-2 border-t border-highlight"></div>
+
+                <button onclick="showAdminPage('backups'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-github-fill w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Backup & GitHub</span></button>
+
+                <button onclick="showAdminPage('settings'); toggleMobileMenu('close')" class="w-full flex items-center p-3 rounded-lg text-gray-400 hover:bg-highlight hover:text-white transition group"><i class="ri-settings-3-line w-6 text-xl group-hover:text-brand"></i><span class="font-medium">Settings</span></button>
+            </nav>
+            <div class="p-4 border-t border-highlight"><button id="admin-logout-btn" class="w-full p-3 rounded-lg border border-highlight hover:bg-red-900/20 text-gray-400 hover:text-brand transition flex items-center justify-center gap-2"><i class="ri-logout-box-line"></i> Logout</button></div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-6 w-full relative bg-base">
+            <div class="md:hidden mb-6 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-brand">ADMIN</h1>
+                <button onclick="toggleMobileMenu()" class="text-white bg-highlight p-2 rounded-lg hover:bg-brand transition"><i class="ri-menu-line text-2xl"></i></button>
+            </div>
+
+            <!-- DASHBOARD -->
+            <div id="dashboard" class="admin-page active">
+                <h2 class="text-2xl font-bold mb-6">Overview</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-surface border border-highlight p-6 rounded-xl">
+                        <p class="text-gray-400 text-xs font-bold uppercase mb-1">Reports</p>
+                        <p id="reports-count" class="text-3xl font-black text-yellow-500">0</p>
+                    </div>
+                    <div class="bg-surface border border-highlight p-6 rounded-xl">
+                        <p class="text-gray-400 text-xs font-bold uppercase mb-1">Requests</p>
+                        <p id="requests-count" class="text-3xl font-black text-brand">0</p>
+                    </div>
+                    <div class="bg-surface border border-highlight p-6 rounded-xl">
+                        <p class="text-gray-400 text-xs font-bold uppercase mb-1">Movies</p>
+                        <p id="movies-count" class="text-3xl font-black text-white">0</p>
+                    </div>
+                    <div class="bg-surface border border-highlight p-6 rounded-xl">
+                        <p class="text-gray-400 text-xs font-bold uppercase mb-1">TV Series</p>
+                        <p id="series-count" class="text-3xl font-black text-white">0</p>
+                    </div>
+                </div>
+
+                <!-- NEW: RECENTLY ADDED WIDGET -->
+                <div class="mt-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">Recently Added</h3>
+                        <button onclick="showAdminPage('library')" class="text-xs text-brand hover:text-white font-bold uppercase">View All</button>
+                    </div>
+                    <div id="recent-added-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        <!-- Dynamic Content -->
+                        <div class="col-span-full py-8 text-center text-gray-500">Loading recent content...</div>
+                    </div>
+                </div>
+
+                <!-- DASHBOARD SEARCH SYSTEM -->
+                <div class="mt-10">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">Quick Manager</h3>
+                        <span class="text-[10px] text-gray-500 bg-highlight px-2 py-1 rounded">SEARCH LOCAL + TMDB</span>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="dashboard-search-input" placeholder="Search your database or TMDB to add new content..." class="w-full bg-surface border border-highlight rounded-xl p-4 pl-12 text-white outline-none focus:border-brand shadow-2xl transition-all">
+                        <i class="ri-search-eye-line absolute left-4 top-4 text-gray-400 text-xl"></i>
+                        <div id="dashboard-loader" class="hidden absolute right-4 top-4">
+                            <div class="loader"></div>
+                        </div>
+                    </div>
+
+                    <div id="dashboard-search-results" class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
+                        <!-- Results render here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTS -->
+            <div id="reports" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">Dead Link Reports</h2>
+                <div class="bg-surface border border-highlight rounded-xl overflow-hidden">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="bg-highlight text-white uppercase font-bold text-xs">
+                            <tr>
+                                <th class="p-4">Content Title</th>
+                                <th class="p-4">Reported By</th>
+                                <th class="p-4">Type</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table" class="divide-y divide-highlight"></tbody>
+                    </table>
+                    <div id="no-reports-msg" class="hidden p-12 text-center text-gray-500">No issues reported.</div>
+                </div>
+            </div>
+
+            <!-- UPDATES -->
+            <div id="updates" class="admin-page">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Smart Updates</h2>
+                        <p class="text-gray-400 text-sm">Detects released episodes missing from your server</p>
+                    </div>
+                    <button onclick="checkUpdates()" class="bg-brand text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:scale-105 transition"><i class="ri-refresh-line"></i> Scan for New Episodes</button>
+                </div>
+                <div id="updates-container" class="space-y-4">
+                    <div class="p-12 text-center text-gray-500 border border-white/10 rounded-xl bg-highlight/10">Click scan to check release dates & missing links.</div>
+                </div>
+            </div>
+
+            <!-- LIBRARY (OPTIMIZED) -->
+            <div id="library" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">Content Library</h2>
+                <div class="mb-6">
+                    <div class="relative"><input type="text" id="library-search" placeholder="Search your added content..." class="w-full bg-surface border border-highlight rounded-lg p-4 pl-12 text-white outline-none focus:border-brand"><i class="ri-search-2-line absolute left-4 top-4 text-gray-400 text-xl"></i></div>
+                </div>
+                <div class="flex gap-6 mb-4 border-b border-highlight">
+                    <button id="lib-tab-movies" onclick="showLibraryTab('movies')" class="library-tab active font-bold py-2 px-1 text-gray-400">Movies</button>
+                    <button id="lib-tab-series" onclick="showLibraryTab('series')" class="library-tab font-bold py-2 px-1 text-gray-400">TV Series</button>
+                </div>
+                <div id="library-container" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 pb-10"></div>
+                <div id="library-loading" class="hidden py-4 text-center text-gray-500">Loading more content...</div>
+                <button id="library-load-more" onclick="loadMoreLibrary()" class="hidden w-full py-3 bg-highlight rounded text-sm font-bold text-gray-400 hover:text-white mb-6">Load More</button>
+            </div>
+
+            <!-- BACKUPS SECTION -->
+            <div id="backups" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">Backup & GitHub</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-surface border border-highlight p-6 rounded-xl flex flex-col">
+                        <h3 class="text-lg font-bold text-white mb-2"><i class="ri-github-fill"></i> GitHub API Settings</h3>
+                        <p class="text-gray-400 text-sm mb-4">Configure automatic daily backups to your GitHub repository.</p>
+                        <div class="space-y-3 flex-1">
+                            <input type="text" id="github-user" placeholder="GitHub Username" class="w-full bg-highlight p-3 rounded-lg text-white outline-none border border-white/10 focus:border-brand">
+                            <input type="text" id="github-repo" placeholder="Repository Name" class="w-full bg-highlight p-3 rounded-lg text-white outline-none border border-white/10 focus:border-brand">
+                            <input type="password" id="github-token" placeholder="Personal Access Token (PAT)" class="w-full bg-highlight p-3 rounded-lg text-white outline-none border border-white/10 focus:border-brand">
+                            <div class="text-xs text-yellow-500 bg-yellow-900/20 border border-yellow-800/50 p-2 rounded-md">
+                                <i class="ri-error-warning-line"></i> Your token is stored in your browser's local storage.
+                            </div>
+                        </div>
+                        <button onclick="saveGitHubSettings()" class="w-full bg-brand text-white px-6 py-3 rounded-lg font-bold mt-4">Save Configuration</button>
+                    </div>
+                    <div class="bg-surface border border-highlight p-6 rounded-xl">
+                        <h3 class="text-lg font-bold text-white mb-2"><i class="ri-history-line"></i> Backup Status & Actions</h3>
+                        <p class="text-gray-400 text-sm mb-4">Backups run automatically once every 24 hours.</p>
+                        <button onclick="performGitHubBackup(true)" class="w-full bg-highlight border border-white/10 text-white p-3 rounded-lg hover:bg-brand transition font-bold flex items-center justify-center gap-2 mb-4">
+                            <i class="ri-upload-cloud-2-line"></i> Manual Backup Now
+                        </button>
+                        <div class="bg-base/50 p-3 rounded-lg">
+                            <p class="text-sm text-gray-400 mb-2">Last Backup: <span id="last-backup-status" class="font-bold text-white">Never</span></p>
+                            <div id="backup-log" class="text-xs text-gray-500 font-mono h-24 overflow-y-auto border-t border-white/10 pt-2 space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div id="settings" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">App Customization</h2>
+                <div class="bg-surface border border-highlight p-6 rounded-xl max-w-xl">
+                    <div class="space-y-4">
+                        <div><label class="block text-xs font-bold text-gray-500 uppercase mb-2">App Name</label><input type="text" id="set-app-name" class="w-full bg-highlight p-3 rounded-lg text-white outline-none border border-white/10"></div>
+                        <div><label class="block text-xs font-bold text-gray-500 uppercase mb-2">Brand Color</label>
+                            <div class="flex gap-4"><input type="color" id="set-app-color" class="h-12 w-20 bg-transparent cursor-pointer"><input type="text" id="set-app-color-text" class="flex-1 bg-highlight p-3 rounded-lg text-white outline-none border border-white/10" readonly></div>
+                        </div>
+                        <div><label class="block text-xs font-bold text-gray-500 uppercase mb-2">Logo Type</label><select id="set-logo-type" class="w-full bg-highlight p-3 rounded-lg text-white outline-none border border-white/10">
+                                <option value="text">Text Only</option>
+                                <option value="image">Image URL</option>
+                            </select></div>
+                        <div id="set-logo-url-group" class="hidden"><label class="block text-xs font-bold text-gray-500 uppercase mb-2">Logo URL</label><input type="text" id="set-logo-url" class="w-full bg-highlight p-3 rounded-lg text-white outline-none border border-white/10"></div>
+                        <button onclick="saveSettings()" class="w-full bg-brand text-white font-bold py-3 rounded-lg mt-4">Apply Changes</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REQUESTS -->
+            <div id="requests" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">User Requests</h2>
+                <div class="bg-surface border border-highlight rounded-xl overflow-hidden">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="bg-highlight text-white uppercase font-bold text-xs">
+                            <tr>
+                                <th class="p-4">Content</th>
+                                <th class="p-4">Requested By</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requests-table" class="divide-y divide-highlight"></tbody>
+                    </table>
+                    <div id="no-requests-msg" class="hidden p-12 text-center text-gray-500">No pending requests.</div>
+                </div>
+            </div>
+
+            <!-- MOVIES & SERIES FORMS (Standard) -->
+            <div id="movies" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">Add New Movie</h2>
+                <div class="relative mb-6 z-30"><input type="text" id="admin-search-movie" placeholder="Search TMDB to Import Movie..." class="w-full bg-highlight border border-white/10 rounded-lg p-4 pl-12 text-white outline-none focus:border-brand"><i class="ri-search-2-line absolute left-4 top-4 text-gray-400 text-xl"></i>
+                    <div id="admin-results-movie" class="suggestions-box hidden"></div>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-lg font-bold" id="movie-form-title">Add Movie Manually</h3><button onclick="resetMovieForm()" class="text-sm text-brand underline">Clear Form</button>
+                </div>
+                <div class="bg-surface border border-highlight p-6 rounded-xl mb-8">
+                    <form id="movie-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="movie-title" placeholder="Title" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand" required>
+                        <input type="number" id="movie-year" placeholder="Year" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand" required>
+                        <input type="text" id="movie-category" placeholder="Genre (Auto-filled)" list="genre-datalist" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand" required>
+
+                        <!-- UPDATED MOVIE SERVER WRAPPER -->
+                        <div id="movie-servers-wrapper" class="md:col-span-2 bg-highlight/20 p-4 rounded-lg border border-white/5 transition duration-500">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-sm font-bold text-white">Stream Servers (Optional)</h4>
+
+                                <!-- MOVIE TOGGLE CHECKBOX -->
+                                <div class="flex items-center gap-2 bg-black/20 px-2 py-1 rounded border border-white/5">
+                                    <input type="checkbox" id="movie-convert-toggle" class="accent-brand w-3 h-3 cursor-pointer">
+                                    <label for="movie-convert-toggle" class="text-[10px] text-gray-300 cursor-pointer select-none">
+                                        Auto /embed/
+                                    </label>
+                                </div>
+
+                                <button type="button" onclick="addServerRow('movie-servers-container')" class="bg-brand text-white text-xs px-2 py-1 rounded">+ Add Server</button>
+                            </div>
+                            <div id="movie-servers-container" class="space-y-2"></div>
+                        </div>
+
+                        <div class="md:col-span-2 grid grid-cols-2 gap-4 p-4 border border-white/5 rounded-lg bg-highlight/20">
+                            <div class="col-span-2 text-xs font-bold text-gray-400 uppercase">Sequence / Franchise (Optional)</div><input type="text" id="movie-seq-name" placeholder="Sequence Name" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand"><input type="number" id="movie-seq-order" placeholder="Order No." class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand">
+                        </div>
+                        <div class="md:col-span-2 border-t border-highlight pt-4 mt-2">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-white font-bold text-sm">Download Links (Optional)</h3><button type="button" onclick="addMovieDownloadRow()" class="bg-highlight border border-white/20 text-white text-xs px-3 py-2 rounded hover:bg-brand transition">+ Add Link</button>
+                            </div>
+                            <div id="movie-downloads-container" class="space-y-2"></div>
+                        </div>
+                        <input type="text" id="movie-poster" placeholder="Poster URL (Vertical)" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand md:col-span-2" required>
+                        <input type="text" id="movie-thumbnail" placeholder="Backdrop URL (Horizontal)" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand md:col-span-2">
+                        <textarea id="movie-description" placeholder="Synopsis" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand md:col-span-2" rows="2"></textarea>
+                        <button type="submit" id="movie-submit-btn" class="bg-brand hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold md:col-span-2 shadow-lg">Save Movie</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="series" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">Add New TV Series</h2>
+                <div class="relative mb-6 z-30"><input type="text" id="admin-search-series" placeholder="Search TMDB to Import Series..." class="w-full bg-highlight border border-white/10 rounded-lg p-3 pl-10 text-white outline-none focus:border-brand text-sm"><i class="ri-search-2-line absolute left-3 top-3 text-gray-400"></i>
+                    <div id="admin-results-series" class="suggestions-box hidden"></div>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-lg font-bold" id="series-form-title">Add TV Series Manually</h3><button onclick="resetSeriesForm()" class="text-xs text-brand underline">Clear Form</button>
+                </div>
+                <div class="bg-surface border border-highlight p-5 rounded-xl mb-8">
+                    <form id="series-form" class="grid grid-cols-2 gap-3">
+                        <input type="text" id="series-title" placeholder="Series Title" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand" required>
+                        <input type="text" id="series-genre" placeholder="Genre" list="genre-datalist" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand" required>
+                        <div class="col-span-2 grid grid-cols-2 gap-3"><select id="series-status" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand">
+                                <option value="Ongoing">Ongoing</option>
+                                <option value="Finished">Finished</option>
+                            </select><input type="number" id="series-year" placeholder="Year" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand"></div>
+                        <input type="text" id="series-poster" placeholder="Poster URL" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand col-span-2" required>
+                        <input type="text" id="series-thumbnail" placeholder="Backdrop URL" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand col-span-2">
+                        <textarea id="series-description" placeholder="Description" class="bg-highlight p-2 rounded text-white text-sm outline-none focus:ring-1 focus:ring-brand col-span-2" rows="2"></textarea>
+                        <div class="col-span-2 border-t border-highlight pt-3 mt-1">
+                            <div class="flex justify-between items-center mb-3 bg-highlight/20 p-2 rounded">
+                                <div class="flex gap-4 items-center">
+                                    <h3 class="text-white font-bold text-sm">Seasons</h3><button type="button" onclick="toggleBulkPanel()" class="text-[10px] text-blue-400 hover:text-white flex items-center gap-1 transition"><i class="ri-magic-line"></i> Bulk Auto-Fill</button>
+                                </div><button type="button" onclick="addSeasonUI()" class="bg-brand text-white text-[10px] px-2 py-1 rounded hover:bg-red-700 transition">+ Add Season</button>
+                            </div>
+                            <div id="bulk-tool-panel" class="hidden mb-4 bg-base border border-highlight p-3 rounded-lg shadow-inner">
+                                <div class="flex justify-between items-center mb-2"><span class="text-xs font-bold text-gray-400">Bulk Link Manager</span><button type="button" onclick="toggleBulkPanel()" class="text-gray-500 hover:text-white"><i class="ri-close-line"></i></button></div>
+                                <div class="flex gap-2 mb-2">
+                                    <select id="bulk-target-season" class="bg-highlight text-white text-[10px] rounded p-1 flex-1 border border-white/10"></select>
+                                    <select id="bulk-sort-mode" class="bg-highlight text-white text-[10px] rounded p-1 flex-1 border border-white/10" onchange="document.getElementById('bulk-custom-map-wrap').classList.toggle('hidden', this.value !== 'custom')">
+                                        <option value="sequential">Line 1 -> Ep 1</option>
+                                        <option value="az">A-Z -> Fill</option>
+                                        <option value="za">Reverse (Z-A) -> Fill</option>
+                                        <option value="custom">Custom Map</option>
+                                    </select>
+                                </div>
+
+                                <!-- SERIES TOGGLE CHECKBOX -->
+                                <div class="flex items-center gap-2 mb-2 px-1 py-1 bg-highlight/10 rounded border border-white/5">
+                                    <input type="checkbox" id="bulk-convert-toggle" class="accent-brand w-3 h-3 cursor-pointer">
+                                    <label for="bulk-convert-toggle" class="text-[10px] text-gray-300 cursor-pointer select-none">
+                                        Auto-replace <span class="text-yellow-500">/file/</span> with <span class="text-green-500">/embed/</span>
+                                    </label>
+                                </div>
+
+                                <div id="bulk-custom-map-wrap" class="hidden mb-2"><input type="text" id="bulk-custom-map" class="w-full bg-highlight text-white text-[10px] rounded p-1 border border-white/10" placeholder="Map: 1, 3, 4 (Sep by comma or space)"></div>
+                                <textarea id="bulk-urls-input" rows="3" class="w-full bg-highlight text-gray-300 text-[10px] rounded p-2 border border-white/10 font-mono" placeholder="Paste Links (One per line)"></textarea>
+                                <button type="button" onclick="applyBulkLinks()" class="w-full mt-2 bg-blue-600/20 text-blue-400 border border-blue-600/50 hover:bg-blue-600 hover:text-white transition rounded p-1 text-xs font-bold">Apply Links</button>
+                                <button type="button" onclick="loadFullFranchise()" class="w-full mt-2 bg-red-600/20 text-red-500 border border-red-600/50 hover:bg-red-600 hover:text-white transition rounded p-1 text-xs font-bold">Load Full Franchise ☠️</button>
+                            </div>
+                            <div id="seasons-container" class="space-y-2"></div>
+                        </div>
+                        <button type="submit" id="series-submit-btn" class="bg-brand hover:bg-red-700 text-white px-4 py-2 rounded font-bold col-span-2 shadow-lg text-sm mt-2">Save Series</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- COLLECTIONS -->
+            <div id="collections" class="admin-page">
+                <h2 class="text-2xl font-bold mb-6">Manage Collections</h2>
+                <div class="bg-surface border border-highlight p-6 rounded-xl mb-8">
+                    <div class="flex gap-4 mb-4"><input id="collection-title" type="text" placeholder="Collection Name" class="bg-highlight p-3 rounded-lg text-white outline-none focus:ring-1 focus:ring-brand flex-1"><button onclick="saveCollection()" class="bg-brand text-white px-6 rounded-lg font-bold">Create</button></div>
+                    <div class="text-xs font-bold text-gray-500 mb-2 uppercase">Select Content:</div>
+                    <div id="collection-selection-list" class="h-48 overflow-y-auto border border-highlight rounded p-2 grid grid-cols-1 md:grid-cols-3 gap-2"></div>
+                </div>
+                <div class="grid grid-cols-1 gap-4" id="collections-list"></div>
+            </div>
+
+            <datalist id="genre-datalist"></datalist>
+        </main>
+    </div>
+
+    <script>
+        // --- SUPABASE CONFIG ---
+        const SUPABASE_URL = "https://zgktvncvqpwxhbigdfks.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpna3R2bmN2cXB3eGhiaWdkZmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMjczNDcsImV4cCI6MjA3OTkwMzM0N30.-FntryjMRyBBCeWHL7eB_sZbq1rKF4-RsPEdbSriQP8";
+
+        const {
+            createClient
+        } = supabase;
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const TMDB_API_KEY = "9860008cae8536cb209f1e20420aa279";
+
+        // --- GLOBAL VARS ---
+        let currentRequestKey = null;
+        let allContent = [],
+            moviesFromDB = [],
+            seriesFromDB = [];
+        let libraryView = 'movies';
+        let libraryLimit = 24;
+        let libraryOffset = 0;
+        let editMode = {
+            active: false,
+            id: null,
+            type: null
+        };
+        let allRequests = [],
+            allReports = [];
+        let adminSearchTimeout, currentImportedCast = [],
+            currentTmdbId = null;
+        let isBackupInProgress = false;
+        let dashSearchTimeout;
+
+        // Auth State Listener
+        sb.auth.onAuthStateChange((event, session) => {
+            const user = session?.user;
+            document.getElementById('login-screen').style.display = user ? 'none' : 'flex';
+            document.getElementById('admin-panel').classList.toggle('hidden', !user);
+            if (user) loadData();
+        });
+
+        document.getElementById('admin-login-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const {
+                error
+            } = await sb.auth.signInWithPassword({
+                email: document.getElementById('admin-email').value,
+                password: document.getElementById('admin-password').value
+            });
+            if (error) document.getElementById('admin-auth-error').textContent = error.message;
+        });
+
+        document.getElementById('admin-logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+        // --- MOBILE MENU LOGIC (SWIPE & OVERLAY) ---
+        function toggleMobileMenu(forceState = null) {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('mobile-menu-overlay');
+            const isHidden = sb.classList.contains('hidden');
+
+            if (forceState === 'open' || (forceState === null && isHidden)) {
+                // Open Menu
+                sb.classList.remove('hidden');
+                sb.classList.add('fixed', 'inset-y-0', 'left-0', 'z-50', 'shadow-2xl');
+                ov.classList.remove('hidden');
+            } else {
+                // Close Menu
+                sb.classList.add('hidden');
+                sb.classList.remove('fixed', 'inset-y-0', 'left-0', 'z-50', 'shadow-2xl');
+                ov.classList.add('hidden');
+            }
+        }
+
+        // Swipe Gestures
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, {
+            passive: true
+        });
+
+        document.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, {
+            passive: true
+        });
+
+        function handleSwipe() {
+            // Swipe Right to Open
+            if (touchEndX - touchStartX > 100 && touchStartX < 50) {
+                toggleMobileMenu('open');
+            }
+            // Swipe Left to Close
+            if (touchStartX - touchEndX > 75) {
+                toggleMobileMenu('close');
+            }
+        }
+
+        function showAdminPage(id) {
+            document.querySelectorAll('.admin-page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        async function loadData() {
+            loadGitHubSettings();
+            checkAutoBackup();
+            await fetchSettings();
+            await fetchMovies();
+            await fetchSeries();
+            loadLibraryChunk(true);
+            renderRecentDashboard(); // Add Recent Widget
+            await fetchRequests();
+            await fetchReports();
+            await fetchCollections();
+
+            document.getElementById('library-search').addEventListener('input', () => loadLibraryChunk(true));
+
+            // Init Dashboard Search Listener
+            document.getElementById('dashboard-search-input').addEventListener('input', (e) => handleDashSearch(e.target.value));
+        }
+
+        // --- RENDER RECENTLY ADDED WIDGET ---
+        function renderRecentDashboard() {
+            // Sort all content by created_at (desc) or ID (desc) if date not available
+            const sorted = [...allContent].sort((a, b) => {
+                if (a.created_at && b.created_at) return new Date(b.created_at) - new Date(a.created_at);
+                return b.id - a.id;
+            }).slice(0, 6); // Top 6
+
+            const grid = document.getElementById('recent-added-grid');
+            if (sorted.length === 0) {
+                grid.innerHTML = '<div class="col-span-full py-8 text-center text-gray-500">No content added yet.</div>';
+                return;
+            }
+
+            grid.innerHTML = sorted.map(v => `
+                <div class="relative group bg-surface rounded-lg overflow-hidden border border-white/10 shadow-lg cursor-pointer" onclick="${v.type === 'movie' ? `editMovie(${v.id})` : `editSeries(${v.id})`}">
+                    <div class="absolute top-1 left-1 z-10">
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-brand/80 text-white uppercase shadow">${v.type}</span>
+                    </div>
+                    <img src="${v.poster}" class="w-full aspect-[2/3] object-cover bg-highlight" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center">
+                        <i class="ri-edit-2-line text-2xl text-white"></i>
+                    </div>
+                    <div class="p-2 absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent pointer-events-none">
+                        <h4 class="text-xs font-bold text-white truncate text-center">${v.title}</h4>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- UPDATED DASHBOARD SEARCH LOGIC ---
+        async function handleDashSearch(query) {
+            clearTimeout(dashSearchTimeout);
+            const resBox = document.getElementById('dashboard-search-results');
+            const loader = document.getElementById('dashboard-loader');
+
+            if (query.length < 2) {
+                resBox.innerHTML = '';
+                return;
+            }
+
+            dashSearchTimeout = setTimeout(async () => {
+                loader.classList.remove('hidden');
+
+                // 1. Search Local first for immediate visual (Optional, but good for UX)
+                // Filter is handled inside the render to combine results
+
+                // 2. Search TMDB (Multi)
+                try {
+                    const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+                    const tmdbData = await tmdbRes.json();
+
+                    loader.classList.add('hidden');
+
+                    let html = '';
+                    const results = tmdbData.results || [];
+
+                    results.forEach(item => {
+                        if (item.media_type !== 'movie' && item.media_type !== 'tv') return;
+
+                        // ROBUST CHECK: Compare Strings to ensure type safety
+                        const exists = allContent.find(c => c.tmdbId && String(c.tmdbId) === String(item.id));
+
+                        const title = item.title || item.name;
+                        const date = (item.release_date || item.first_air_date || '').split('-')[0];
+                        const poster = item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://via.placeholder.com/200x300?text=No+Poster';
+                        const type = item.media_type === 'tv' ? 'series' : 'movie';
+
+                        html += `
+                        <div class="bg-surface border border-highlight rounded-xl overflow-hidden flex gap-4 p-3 hover:border-brand transition group">
+                            <img src="${poster}" class="w-20 h-28 object-cover rounded-lg bg-highlight shadow-lg">
+                            <div class="flex-1 flex flex-col justify-between min-w-0">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-highlight text-gray-400 uppercase">${type}</span>
+                                        ${exists ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-500 uppercase">In Library</span>' : ''}
+                                    </div>
+                                    <h4 class="text-sm font-bold text-white truncate group-hover:text-brand transition">${title}</h4>
+                                    <p class="text-xs text-gray-500">${date}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    ${exists ? `
+                                        <button onclick="handleEditExisting('${exists.type}', ${exists.id})" class="flex-1 bg-green-600 text-white text-[10px] font-bold py-2 rounded shadow-lg hover:bg-green-700 transition">Manage (In Library)</button>
+                                    ` : `
+                                        <button onclick="importContentFromTMDB(${item.id}, '${item.media_type === 'tv' ? 'Series' : 'Movie'}')" class="flex-1 bg-brand text-white text-[10px] font-bold py-2 rounded shadow-lg hover:scale-105 transition">Import Now</button>
+                                    `}
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+
+                    if (html === '') resBox.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">No matching content found.</div>';
+                    else resBox.innerHTML = html;
+
+                } catch (e) {
+                    loader.classList.add('hidden');
+                    console.error(e);
+                }
+            }, 600);
+        }
+
+        async function fetchMovies() {
+            const {
+                data
+            } = await sb.from('movies').select('id, title, year, genre, poster, tmdb_id, created_at');
+            if (data) {
+                moviesFromDB = data;
+                document.getElementById('movies-count').textContent = data.length;
+                updateContentList(data, 'movie');
+            }
+        }
+
+        async function fetchSeries() {
+            const {
+                data
+            } = await sb.from('series').select('id, title, year, genre, status, poster, tmdb_id, seasons, created_at');
+            if (data) {
+                seriesFromDB = data;
+                if (document.getElementById('series-count')) {
+                    document.getElementById('series-count').textContent = data.length;
+                }
+                updateContentList(data, 'series');
+            }
+        }
+
+        // --- OPTIMIZED LIBRARY FUNCTIONS ---
+        function showLibraryTab(tab) {
+            libraryView = tab;
+            document.getElementById('lib-tab-movies').classList.toggle('active', tab === 'movies');
+            document.getElementById('lib-tab-series').classList.toggle('active', tab === 'series');
+            loadLibraryChunk(true);
+        }
+
+        function loadLibraryChunk(reset = false) {
+            if (reset) {
+                libraryOffset = 0;
+                document.getElementById('library-container').innerHTML = '';
+            }
+
+            const source = libraryView === 'movies' ? moviesFromDB : seriesFromDB;
+            const query = document.getElementById('library-search').value.toLowerCase();
+            const filtered = source.filter(i => i.title.toLowerCase().includes(query));
+            const chunk = filtered.slice(libraryOffset, libraryOffset + libraryLimit);
+
+            if (chunk.length === 0 && reset) {
+                document.getElementById('library-container').innerHTML = '<div class="col-span-full text-center text-gray-500 p-10">No content found.</div>';
+                document.getElementById('library-load-more').classList.add('hidden');
+                return;
+            }
+
+            const html = chunk.map(v => `
+                <div class="relative group bg-surface rounded-lg overflow-hidden border border-white/10 shadow-lg">
+                    <img src="${v.poster}" class="w-full aspect-[2/3] object-cover bg-highlight" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                    <div class="absolute inset-0 bg-black/80 admin-card-overlay opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col items-center justify-center gap-3">
+                        <button onclick="${libraryView === 'movies' ? `editMovie(${v.id})` : `editSeries(${v.id})`}" class="bg-brand text-white px-4 py-2 rounded font-bold hover:scale-105 transition">Edit</button>
+                        <button onclick="deleteItem('${libraryView}', ${v.id})" class="bg-white text-red-600 px-4 py-2 rounded font-bold hover:scale-105 transition">Delete</button>
+                    </div>
+                    <div class="p-2 absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent pointer-events-none">
+                        <h4 class="text-xs font-bold text-white truncate text-center">${v.title}</h4>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('library-container').insertAdjacentHTML('beforeend', html);
+            libraryOffset += libraryLimit;
+
+            if (libraryOffset < filtered.length) {
+                document.getElementById('library-load-more').classList.remove('hidden');
+            } else {
+                document.getElementById('library-load-more').classList.add('hidden');
+            }
+        }
+
+        function loadMoreLibrary() {
+            document.getElementById('library-loading').classList.remove('hidden');
+            setTimeout(() => {
+                loadLibraryChunk(false);
+                document.getElementById('library-loading').classList.add('hidden');
+            }, 50);
+        }
+
+        function saveGitHubSettings() {
+            const config = {
+                user: document.getElementById('github-user').value,
+                repo: document.getElementById('github-repo').value,
+                token: document.getElementById('github-token').value,
+            };
+            localStorage.setItem('github_backup_config', JSON.stringify(config));
+            alert("GitHub configuration saved in browser!");
+        }
+
+        function loadGitHubSettings() {
+            const configStr = localStorage.getItem('github_backup_config');
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                document.getElementById('github-user').value = config.user || '';
+                document.getElementById('github-repo').value = config.repo || '';
+                document.getElementById('github-token').value = config.token || '';
+            }
+            const lastBackupTime = localStorage.getItem('github_last_backup');
+            if (lastBackupTime) {
+                document.getElementById('last-backup-status').textContent = new Date(parseInt(lastBackupTime)).toLocaleString();
+            }
+        }
+
+        function logBackupStatus(message, isError = false) {
+            const logContainer = document.getElementById('backup-log');
+            const time = new Date().toLocaleTimeString();
+            const color = isError ? 'text-red-500' : 'text-gray-400';
+            logContainer.innerHTML = `<p class="${color}">[${time}] ${message}</p>` + logContainer.innerHTML;
+        }
+
+        async function performGitHubBackup(isManual = false) {
+            if (isBackupInProgress) {
+                alert("Backup is already in progress.");
+                return;
+            }
+            const configStr = localStorage.getItem('github_backup_config');
+            if (!configStr) {
+                logBackupStatus("GitHub config not found.", true);
+                return;
+            }
+            const config = JSON.parse(configStr);
+            if (!config.user || !config.repo || !config.token) {
+                if (isManual) alert("GitHub credentials missing.");
+                return;
+            }
+
+            isBackupInProgress = true;
+            logBackupStatus("Starting backup process...");
+
+            try {
+                const {
+                    data: movies
+                } = await sb.from('movies').select('*');
+                const {
+                    data: series
+                } = await sb.from('series').select('*');
+                await uploadFileToGitHub('movies_backup.json', JSON.stringify(movies, null, 2), config);
+                await uploadFileToGitHub('series_backup.json', JSON.stringify(series, null, 2), config);
+                const now = Date.now();
+                localStorage.setItem('github_last_backup', now);
+                document.getElementById('last-backup-status').textContent = new Date(now).toLocaleString();
+                logBackupStatus("✅ Backup completed successfully!");
+                if (isManual) alert("Manual backup successful!");
+            } catch (error) {
+                logBackupStatus(`Error: ${error.message}`, true);
+            } finally {
+                isBackupInProgress = false;
+            }
+        }
+
+        async function uploadFileToGitHub(filePath, content, config) {
+            const {
+                user,
+                repo,
+                token
+            } = config;
+            const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/${filePath}`;
+            const headers = {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+            };
+            let sha;
+            try {
+                const response = await fetch(apiUrl, {
+                    headers
+                });
+                if (response.ok) {
+                    const fileData = await response.json();
+                    sha = fileData.sha;
+                }
+            } catch (e) {}
+            const uploadResponse = await fetch(apiUrl, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({
+                    message: `Automated backup: ${new Date().toISOString()}`,
+                    content: btoa(unescape(encodeURIComponent(content))),
+                    sha: sha
+                }),
+            });
+            if (!uploadResponse.ok) throw new Error(`GitHub API failed for ${filePath}`);
+        }
+
+        function checkAutoBackup() {
+            const lastBackup = parseInt(localStorage.getItem('github_last_backup') || '0');
+            const oneDay = 24 * 60 * 60 * 1000;
+            if (Date.now() - lastBackup > oneDay) {
+                performGitHubBackup(false);
+            }
+        }
+
+        async function fetchReports() {
+            const {
+                data
+            } = await sb.from('reports').select('*');
+            if (data) {
+                allReports = data;
+                document.getElementById('reports-count').textContent = data.length;
+                document.getElementById('report-badge').textContent = data.length;
+                document.getElementById('report-badge').classList.toggle('hidden', data.length === 0);
+                const l = document.getElementById('reports-table');
+                l.innerHTML = '';
+                if (!allReports.length) {
+                    document.getElementById('no-reports-msg').classList.remove('hidden');
+                } else {
+                    document.getElementById('no-reports-msg').classList.add('hidden');
+                    allReports.forEach(r => l.insertAdjacentHTML('beforeend', `<tr><td class="p-4"><div class="font-bold text-white">${r.title||'Unknown'}</div></td><td class="p-4 text-gray-400 text-xs">${r.requested_by||'Anon'}</td><td class="p-4 text-brand text-xs font-bold">${r.type}</td><td class="p-4 text-right"><button onclick="handleFixReport('${r.id}', '${r.content_id}')" class="bg-yellow-600/20 text-yellow-500 hover:bg-yellow-600 hover:text-white px-3 py-1 rounded text-xs font-bold mr-2"><i class="ri-tools-fill"></i> Fix</button><button onclick="deleteReport('${r.id}')" class="bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white px-3 py-1 rounded text-xs font-bold"><i class="ri-delete-bin-line"></i></button></td></tr>`));
+                }
+            }
+        }
+
+        async function deleteReport(id) {
+            if (confirm("Delete this report?")) {
+                await sb.from('reports').delete().eq('id', id);
+                fetchReports();
+            }
+        }
+
+        async function handleFixReport(rid, cid) {
+            const item = allContent.find(i => i.id == cid);
+            if (!item) return alert("Content not found.");
+            if (item.type === 'movie') await editMovie(item.id);
+            else await editSeries(item.id);
+            if (confirm("Content opened. Delete report?")) {
+                await sb.from('reports').delete().eq('id', rid);
+                fetchReports();
+            }
+        }
+
+        async function fetchRequests() {
+            const {
+                data
+            } = await sb.from('requests').select('*');
+            if (data) {
+                allRequests = data;
+                document.getElementById('requests-count').textContent = data.length;
+                document.getElementById('req-badge').textContent = data.length;
+                document.getElementById('req-badge').classList.toggle('hidden', data.length === 0);
+                document.getElementById('requests-table').innerHTML = data.map(v => `<tr><td class="p-4 text-white flex gap-4 items-center"><img src="${v.poster || 'https://via.placeholder.com/40'}" class="w-10 h-14 object-cover rounded bg-white/10" onerror="this.src='https://via.placeholder.com/40?text=Err'"><div><div class="font-bold">${v.title}</div><div class="text-xs text-gray-500 uppercase">${v.type || 'Unknown'}</div></div></td><td class="p-4 text-gray-400 text-xs">${v.requested_by}</td><td class="p-4 text-right"><button onclick="fillFromRequest('${v.id}')" class="bg-green-600/20 text-green-500 hover:bg-green-600 hover:text-white px-3 py-1 rounded text-xs font-bold mr-2 transition"><i class="ri-check-line"></i> Approve</button><button onclick="deleteRequest('${v.id}')" class="bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white px-3 py-1 rounded text-xs font-bold transition"><i class="ri-delete-bin-line"></i> Delete</button></td></tr>`).join('');
+                document.getElementById('no-requests-msg').classList.toggle('hidden', data.length > 0);
+            }
+        }
+
+        async function fetchCollections() {
+            const {
+                data
+            } = await sb.from('collections').select('*');
+            if (data) {
+                document.getElementById('collections-list').innerHTML = data.map(v => `<div class="bg-surface border border-highlight p-4 rounded-lg flex justify-between items-center"><div><h4 class="text-white font-bold">${v.title}</h4><span class="text-xs text-gray-500">${v.content_ids ? v.content_ids.length : 0} Items</span></div><button onclick="deleteItem('collections', ${v.id})" class="text-red-500 hover:text-white"><i class="ri-delete-bin-line text-xl"></i></button></div>`).join('');
+            }
+        }
+
+        async function fetchSettings() {
+            const {
+                data
+            } = await sb.from('settings').select('*').limit(1);
+            if (data && data.length > 0) {
+                const v = data[0];
+                document.getElementById('set-app-name').value = v.app_name || 'MultiFlix';
+                document.getElementById('set-app-color').value = v.color || '#E50914';
+                document.getElementById('set-app-color-text').value = v.color || '#E50914';
+                document.getElementById('set-logo-type').value = v.logo_type || 'text';
+                document.getElementById('set-logo-url').value = v.logo_url || '';
+                toggleLogoInput();
+            }
+        }
+
+        document.getElementById('set-app-color').addEventListener('input', (e) => document.getElementById('set-app-color-text').value = e.target.value);
+        document.getElementById('set-logo-type').addEventListener('change', toggleLogoInput);
+
+        function toggleLogoInput() {
+            document.getElementById('set-logo-url-group').classList.toggle('hidden', document.getElementById('set-logo-type').value !== 'image');
+        }
+
+        async function saveSettings() {
+            const settingsData = {
+                id: 1,
+                app_name: document.getElementById('set-app-name').value,
+                color: document.getElementById('set-app-color').value,
+                logo_type: document.getElementById('set-logo-type').value,
+                logo_url: document.getElementById('set-logo-url').value,
+            };
+            const {
+                error
+            } = await sb.from('settings').upsert(settingsData);
+            if (!error) alert("App Settings Applied!");
+        }
+
+        // --- UPGRADED CHECK UPDATES: Release Date & Missing Link Detection ---
+        async function checkUpdates() {
+            const container = document.getElementById('updates-container');
+            container.innerHTML = '<div class="text-center text-brand p-10 animate-pulse">Scanning TMDB & Checking Links...</div>';
+
+            await fetchSeries(); // Refresh local data
+
+            const ongoing = allContent.filter(i => i.type === 'series' && i.status === 'Ongoing' && i.tmdbId);
+            let updatesFound = 0;
+            let html = '';
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            for (const series of ongoing) {
+                try {
+                    // 1. Fetch TMDB Main Data to get total seasons
+                    const res = await fetch(`https://api.themoviedb.org/3/tv/${series.tmdbId}?api_key=${TMDB_API_KEY}`);
+                    const data = await res.json();
+
+                    let missingEpisodesCount = 0;
+
+                    // Get the last season index from TMDB (usually the one airing)
+                    const lastSeasonData = data.seasons[data.seasons.length - 1];
+
+                    if (lastSeasonData && lastSeasonData.season_number > 0) {
+                        // 2. Fetch specific season details to get air dates
+                        const sRes = await fetch(`https://api.themoviedb.org/3/tv/${series.tmdbId}/season/${lastSeasonData.season_number}?api_key=${TMDB_API_KEY}`);
+                        const sData = await sRes.json();
+
+                        // 3. Find corresponding local season
+                        const localSeason = series.seasons ? series.seasons.find(s => s.name === sData.name || s.name.includes(`Season ${sData.season_number}`)) : null;
+
+                        // 4. Loop through TMDB episodes
+                        sData.episodes.forEach(tmdbEp => {
+                            if (!tmdbEp.air_date) return;
+
+                            const releaseDate = new Date(tmdbEp.air_date);
+                            // If released or released today
+                            if (releaseDate <= today) {
+                                let isMissing = true;
+
+                                if (localSeason && localSeason.episodes) {
+                                    // Try to find the episode locally (by index usually as names vary, assuming index matches)
+                                    // TMDB episodes are usually 1-indexed in array but let's map by episode_number
+                                    const localEp = localSeason.episodes[tmdbEp.episode_number - 1];
+
+                                    if (localEp) {
+                                        // Episode exists locally, but does it have a link?
+                                        const hasServer = localEp.servers && localEp.servers.length > 0 && localEp.servers.some(s => s.url && s.url.trim() !== "");
+                                        const hasDirect = localEp.link && localEp.link.trim() !== ""; // Legacy structure support
+
+                                        if (hasServer || hasDirect) {
+                                            isMissing = false;
+                                        }
+                                    }
+                                }
+
+                                if (isMissing) {
+                                    missingEpisodesCount++;
+                                }
+                            }
+                        });
+                    }
+
+                    if (missingEpisodesCount > 0) {
+                        updatesFound++;
+                        html += `
+                        <div class="bg-surface border border-l-4 border-red-500 p-4 rounded-xl flex justify-between items-center mb-2">
+                            <div class="flex items-center gap-4">
+                                <img src="${series.poster}" class="w-12 h-18 rounded object-cover">
+                                <div>
+                                    <h3 class="font-bold text-white">${series.title}</h3>
+                                    <p class="text-xs text-gray-400">
+                                        <span class="text-red-500 font-bold">${missingEpisodesCount} Episodes</span> Released but missing links.
+                                    </p>
+                                </div>
+                            </div>
+                            <button onclick="importUpdatesToForm('${series.id}', ${series.tmdbId})" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-700 shadow-lg animate-pulse">
+                                <i class="ri-edit-circle-line"></i> Update Now
+                            </button>
+                        </div>`;
+                    }
+                } catch (e) {
+                    console.error("Update scan error for", series.title, e);
+                }
+            }
+
+            if (updatesFound === 0) {
+                container.innerHTML = '<div class="text-center text-green-500 p-10"><i class="ri-check-double-line text-4xl mb-2 block"></i>All released episodes have valid links!</div>';
+            } else {
+                container.innerHTML = html;
+            }
+            document.getElementById('update-badge').textContent = updatesFound;
+            document.getElementById('update-badge').classList.toggle('hidden', updatesFound === 0);
+        }
+
+        async function importUpdatesToForm(dbId, tmdbId) {
+            await editSeries(dbId);
+            alert("Loading new data from TMDB... Please wait.");
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_API_KEY}`);
+                const data = await res.json();
+                const seasonContainers = document.querySelectorAll('.season-block');
+                const existingSeasons = Array.from(seasonContainers).map(block => {
+                    const name = block.querySelector('.season-name').value;
+                    const eps = block.querySelectorAll('.episode-row').length;
+                    return {
+                        element: block,
+                        name: name,
+                        epCount: eps
+                    };
+                });
+                let addedCount = 0;
+                for (const season of data.seasons) {
+                    if (season.season_number === 0) continue;
+                    const localSeason = existingSeasons.find(es => es.name.includes(`Season ${season.season_number}`) || es.name === season.name);
+                    if (localSeason) {
+                        // Check if TMDB has more episodes
+                        if (season.episode_count > localSeason.epCount) {
+                            const sRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`);
+                            const sData = await sRes.json();
+                            const currentEpCount = localSeason.epCount;
+                            // Only add episodes that don't exist in the form
+                            const episodesToAdd = sData.episodes.slice(currentEpCount);
+                            const epContainer = localSeason.element.querySelector('.episodes-container');
+                            episodesToAdd.forEach(ep => {
+                                addEpisodeUI(null, epContainer, {
+                                    title: ep.name,
+                                    servers: [{
+                                        name: "Server 1",
+                                        url: ""
+                                    }],
+                                    downloadLink: ""
+                                });
+                                addedCount++;
+                            });
+                        }
+                    } else {
+                        // Add whole new season
+                        const sRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`);
+                        const sData = await sRes.json();
+                        const episodes = sData.episodes.map(ep => ({
+                            title: ep.name,
+                            servers: [{
+                                name: "Server 1",
+                                url: ""
+                            }],
+                            downloadLink: ""
+                        }));
+                        addSeasonUI({
+                            name: season.name,
+                            episodes: episodes
+                        });
+                        addedCount += episodes.length;
+                    }
+                }
+                if (addedCount > 0) {
+                    alert(`Imported ${addedCount} new episode slots to the form! \n\nPlease add links now and click 'Update Series' to save.`);
+                } else {
+                    alert("No new episodes found to add, but you can manually check links.");
+                }
+            } catch (e) {
+                alert("Error importing new episodes: " + e.message);
+            }
+        }
+
+
+        function updateContentList(data, type) {
+            const n = data.map(v => ({
+                id: v.id,
+                title: v.title,
+                type: type,
+                genre: v.genre,
+                status: v.status,
+                tmdbId: v.tmdb_id,
+                seasons: v.seasons,
+                poster: v.poster,
+                created_at: v.created_at
+            }));
+            allContent = allContent.filter(i => i.type !== type).concat(n);
+            renderCollectionChecklist();
+            renderRecentDashboard(); // Refresh widget when list updates
+            let genres = [...new Set(allContent.map(i => i.genre).filter(Boolean))];
+            if (!genres.includes("Action")) genres.push("Action");
+            genres.sort();
+            document.getElementById('genre-datalist').innerHTML = genres.map(g => `<option value="${g}">`).join('');
+        }
+
+        function renderCollectionChecklist() {
+            document.getElementById('collection-selection-list').innerHTML = allContent.map(item => `<label class="flex items-center gap-2 p-2 hover:bg-highlight rounded cursor-pointer"><input type="checkbox" value="${item.id}" class="collection-checkbox accent-brand w-4 h-4"><span class="text-sm text-gray-300 truncate">${item.title}</span><span class="text-[10px] bg-highlight px-1 rounded text-gray-500 uppercase">${item.type}</span></label>`).join('');
+        }
+
+        async function saveCollection() {
+            const title = document.getElementById('collection-title').value;
+            if (!title) return alert("Collection name is required.");
+            const selected = Array.from(document.querySelectorAll('.collection-checkbox:checked')).map(cb => cb.value);
+            if (selected.length === 0) return alert("Select content for the collection.");
+            await sb.from('collections').insert({
+                title: title,
+                content_ids: selected
+            });
+            document.getElementById('collection-title').value = '';
+            document.querySelectorAll('.collection-checkbox:checked').forEach(cb => cb.checked = false);
+            fetchCollections();
+        }
+
+        async function deleteItem(table, id) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                await sb.from(table).delete().eq('id', id);
+                if (table === 'movies') {
+                    await fetchMovies();
+                    loadLibraryChunk(true);
+                }
+                if (table === 'series') {
+                    await fetchSeries();
+                    loadLibraryChunk(true);
+                }
+                if (table === 'collections') await fetchCollections();
+
+                // Refresh Dash Search if active
+                handleDashSearch(document.getElementById('dashboard-search-input').value);
+            }
+        }
+
+        async function deleteRequest(id) {
+            if (confirm('Reject and delete this request?')) {
+                await sb.from('requests').delete().eq('id', id);
+                fetchRequests();
+            }
+        }
+
+        async function importContentFromTMDB(tmdbId, type) {
+            const endpoint = type === 'Series' ? `tv/${tmdbId}` : `movie/${tmdbId}`;
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/${endpoint}?api_key=${TMDB_API_KEY}&append_to_response=credits`);
+                const data = await res.json();
+                const primaryGenre = data.genres && data.genres.length > 0 ? data.genres[0].name : 'Action';
+                currentImportedCast = data.credits && data.credits.cast ? data.credits.cast.slice(0, 20).map(c => ({
+                    name: c.name,
+                    photo: c.profile_path ? `https://image.tmdb.org/t/p/w200${c.profile_path}` : ''
+                })) : [];
+                currentTmdbId = tmdbId;
+
+                if (type === 'Series') {
+                    showAdminPage('series');
+                    resetSeriesForm(true);
+                    document.getElementById('series-title').value = data.name;
+                    document.getElementById('series-year').value = data.first_air_date ? data.first_air_date.split('-')[0] : '';
+                    document.getElementById('series-genre').value = primaryGenre;
+                    document.getElementById('series-poster').value = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : '';
+                    document.getElementById('series-thumbnail').value = data.backdrop_path ? `https://image.tmdb.org/t/p/original${data.backdrop_path}` : '';
+                    document.getElementById('series-description').value = data.overview;
+                    document.getElementById('series-status').value = data.status === "Ended" ? "Finished" : "Ongoing";
+                    const container = document.getElementById('seasons-container');
+                    container.innerHTML = '';
+                    for (const season of data.seasons) {
+                        if (season.season_number === 0) continue;
+                        const sRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`);
+                        const sData = await sRes.json();
+                        const episodes = sData.episodes.map(ep => ({
+                            title: ep.name,
+                            servers: [{
+                                name: "Server 1",
+                                url: ""
+                            }],
+                            downloadLink: ""
+                        }));
+                        addSeasonUI({
+                            name: season.name,
+                            episodes: episodes
+                        });
+                    }
+                    updateBulkSeasonSelect();
+                } else {
+                    showAdminPage('movies');
+                    resetMovieForm(true);
+                    document.getElementById('movie-title').value = data.title;
+                    document.getElementById('movie-year').value = data.release_date ? data.release_date.split('-')[0] : '';
+                    document.getElementById('movie-category').value = primaryGenre;
+                    document.getElementById('movie-poster').value = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : '';
+                    document.getElementById('movie-thumbnail').value = data.backdrop_path ? `https://image.tmdb.org/t/p/original${data.backdrop_path}` : '';
+                    document.getElementById('movie-description').value = data.overview;
+                    if (data.belongs_to_collection) document.getElementById('movie-seq-name').value = data.belongs_to_collection.name;
+
+                    document.getElementById('movie-servers-container').innerHTML = '';
+                    addServerRow('movie-servers-container', {
+                        name: 'Server 1',
+                        url: ''
+                    });
+                }
+                document.getElementById('admin-results-movie').classList.add('hidden');
+                document.getElementById('admin-results-series').classList.add('hidden');
+            } catch (error) {
+                alert("Error importing.");
+            }
+        }
+
+        function fillFromRequest(reqId) {
+            currentRequestKey = reqId;
+            const req = allRequests.find(r => r.id.toString() === reqId.toString());
+            if (!req) return alert("Request not found locally.");
+            if (req.tmdb_id) {
+                importContentFromTMDB(req.tmdb_id, req.type);
+            } else if (req.title) {
+                const isSeries = req.type && (req.type.toLowerCase() === 'series' || req.type.toLowerCase() === 'tv');
+                const targetPage = isSeries ? 'series' : 'movies';
+                const searchInputId = isSeries ? 'admin-search-series' : 'admin-search-movie';
+                alert(`Auto-searching for: "${req.title}"`);
+                showAdminPage(targetPage);
+                if (isSeries) resetSeriesForm(true);
+                else resetMovieForm(true);
+                const input = document.getElementById(searchInputId);
+                input.value = req.title;
+                input.focus();
+                input.dispatchEvent(new Event('input', {
+                    bubbles: true
+                }));
+            }
+        }
+
+        function handleEditExisting(type, dbId) {
+            // Close search results boxes if open
+            document.getElementById('admin-results-movie').classList.add('hidden');
+            document.getElementById('admin-results-series').classList.add('hidden');
+
+            // Switch tabs and load data
+            if (type === 'movie') editMovie(dbId);
+            else if (type === 'series') editSeries(dbId);
+
+            // If on mobile menu, close it
+            toggleMobileMenu('close');
+        }
+
+        function setupAdminSearch(inputId, resultsId, type) {
+            document.getElementById(inputId).addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                clearTimeout(adminSearchTimeout);
+                const box = document.getElementById(resultsId);
+                if (query.length < 2) {
+                    box.classList.add('hidden');
+                    return;
+                }
+                adminSearchTimeout = setTimeout(() => {
+                    fetch(`https://api.themoviedb.org/3/search/${type === 'Series' ? 'tv' : 'movie'}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            box.classList.remove('hidden');
+                            if (!data.results) {
+                                box.innerHTML = '<div class="p-4 text-center text-gray-500">No results found.</div>';
+                                return;
+                            }
+                            box.innerHTML = data.results.slice(0, 7).map(item => {
+                                const existingItem = allContent.find(c => c.tmdbId && String(c.tmdbId) === String(item.id));
+                                if (existingItem) {
+                                    return `
+                                <div onclick="handleEditExisting('${existingItem.type}', ${existingItem.id})" title="Already in database." class="flex items-center justify-between gap-3 p-2 hover:bg-highlight/50 cursor-pointer border-b border-white/5">
+                                    <div class="flex items-center gap-3 overflow-hidden"><img src="${item.poster_path ? 'https://image.tmdb.org/t/p/w92'+item.poster_path : 'https://via.placeholder.com/50'}" class="w-10 h-14 object-cover rounded flex-shrink-0" onerror="this.src='https://via.placeholder.com/50?text=?'"><div class="overflow-hidden"><div class="text-sm font-bold text-white truncate">${item.title || item.name}</div><div class="text-xs text-gray-500">${(item.release_date || item.first_air_date || '').split('-')[0]}</div></div></div>
+                                    <span class="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0">ADDED</span>
+                                </div>`;
+                                } else {
+                                    return `
+                                <div onclick="importContentFromTMDB(${item.id}, '${type}')" class="flex items-center gap-3 p-2 hover:bg-highlight cursor-pointer border-b border-white/5">
+                                    <img src="${item.poster_path ? 'https://image.tmdb.org/t/p/w92'+item.poster_path : 'https://via.placeholder.com/50'}" class="w-10 h-14 object-cover rounded" onerror="this.src='https://via.placeholder.com/50?text=?'">
+                                    <div><div class="text-sm font-bold text-white">${item.title || item.name}</div><div class="text-xs text-gray-500">${(item.release_date || item.first_air_date || '').split('-')[0]}</div></div>
+                                </div>`;
+                                }
+                            }).join('');
+                        });
+                }, 500);
+            });
+        }
+        setupAdminSearch('admin-search-movie', 'admin-results-movie', 'Movie');
+        setupAdminSearch('admin-search-series', 'admin-results-series', 'Series');
+
+        // --- DYNAMIC SERVER ROWS UI ---
+        function addServerRow(containerId, data = {
+            name: '',
+            url: ''
+        }) {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = "flex gap-2 server-row items-center";
+            div.innerHTML = `<input type="text" class="server-name bg-highlight text-white text-xs rounded p-2 w-1/4 outline-none border border-white/10 focus:border-brand" placeholder="Name (e.g. Server 1)" value="${data.name}"><input type="text" class="server-url bg-highlight text-gray-300 text-xs rounded p-2 flex-1 outline-none border border-white/10 focus:border-brand" placeholder="https://..." value="${data.url}"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 bg-red-500/10 p-2 rounded hover:bg-red-500 hover:text-white"><i class="ri-delete-bin-line"></i></button>`;
+            container.appendChild(div);
+        }
+
+        // --- UPDATED MOVIE SERVER LOGIC WITH TOGGLE ---
+        function getServersFromContainer(container) {
+            const servers = [];
+            // Check if Movie toggle exists and is checked
+            const movieToggle = document.getElementById('movie-convert-toggle');
+            const doConvert = movieToggle ? movieToggle.checked : false;
+
+            container.querySelectorAll('.server-row').forEach(row => {
+                const name = row.querySelector('.server-name').value.trim();
+                let url = row.querySelector('.server-url').value.trim();
+
+                // Apply logic if toggle is ON
+                if (doConvert && url.includes('/file/')) {
+                    url = url.replace('/file/', '/embed/');
+                }
+
+                if (name && url) servers.push({
+                    name,
+                    url
+                });
+            });
+            return servers;
+        }
+
+        // --- MOVIES LOGIC ---
+        function resetMovieForm(keepRequest = false) {
+            document.getElementById('movie-form').reset();
+            document.getElementById('movie-downloads-container').innerHTML = '';
+            document.getElementById('movie-servers-container').innerHTML = '';
+            addServerRow('movie-servers-container', {
+                name: 'Server 1',
+                url: ''
+            });
+            editMode = {
+                active: false
+            };
+            currentImportedCast = [];
+            currentTmdbId = null;
+            if (!keepRequest) currentRequestKey = null;
+            document.getElementById('movie-submit-btn').innerText = "Save Movie";
+            document.getElementById('movie-form-title').innerText = "Add Movie Manually";
+            localStorage.removeItem('autosave_movie'); // Clear draft
+        }
+
+        function addMovieDownloadRow(d) {
+            const div = document.createElement('div');
+            div.className = "flex gap-2 dl-row items-center";
+            div.innerHTML = `<input type="text" class="dl-title bg-highlight text-white text-xs rounded p-2 w-1/3 outline-none border border-white/10 focus:border-brand" placeholder="Quality" value="${d?d.title:''}"><input type="text" class="dl-link bg-highlight text-gray-400 text-xs rounded p-2 flex-1 outline-none border border-white/10 focus:border-brand" placeholder="URL" value="${d?d.link:''}"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 bg-red-500/10 p-2 rounded hover:bg-red-500 hover:text-white"><i class="ri-delete-bin-line"></i></button>`;
+            document.getElementById('movie-downloads-container').appendChild(div);
+        }
+
+        async function editMovie(id) {
+            showAdminPage('movies');
+            const {
+                data: v
+            } = await sb.from('movies').select('*').eq('id', id).single();
+            if (v) {
+                document.getElementById('movie-title').value = v.title;
+                document.getElementById('movie-year').value = v.year;
+                document.getElementById('movie-category').value = v.genre;
+                const serversContainer = document.getElementById('movie-servers-container');
+                serversContainer.innerHTML = '';
+                if (v.servers && v.servers.length > 0) v.servers.forEach(srv => addServerRow('movie-servers-container', srv));
+                else addServerRow('movie-servers-container');
+                document.getElementById('movie-poster').value = v.poster;
+                document.getElementById('movie-thumbnail').value = v.thumbnail;
+                document.getElementById('movie-description').value = v.description;
+                document.getElementById('movie-seq-name').value = v.sequence_name || '';
+                document.getElementById('movie-seq-order').value = v.sequence_order || '';
+                document.getElementById('movie-downloads-container').innerHTML = '';
+                if (v.downloads) v.downloads.forEach(d => addMovieDownloadRow(d));
+                currentImportedCast = v.cast_data || [];
+                currentTmdbId = v.tmdb_id || null;
+                editMode = {
+                    active: true,
+                    id: id,
+                    type: 'movie'
+                };
+                document.getElementById('movie-submit-btn').innerText = "Update Movie";
+                document.getElementById('movie-form-title').innerText = "Editing: " + v.title;
+                document.getElementById('movie-form').scrollIntoView();
+            }
+        }
+
+        document.getElementById('movie-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const dls = [];
+            document.querySelectorAll('.dl-row').forEach(r => {
+                if (r.querySelector('.dl-title').value) dls.push({
+                    title: r.querySelector('.dl-title').value,
+                    link: r.querySelector('.dl-link').value
+                });
+            });
+            const servers = getServersFromContainer(document.getElementById('movie-servers-container'));
+            const data = {
+                title: document.getElementById('movie-title').value,
+                year: document.getElementById('movie-year').value,
+                genre: document.getElementById('movie-category').value,
+                servers: servers,
+                poster: document.getElementById('movie-poster').value,
+                thumbnail: document.getElementById('movie-thumbnail').value,
+                description: document.getElementById('movie-description').value,
+                downloads: dls,
+                cast_data: currentImportedCast,
+                tmdb_id: currentTmdbId ? String(currentTmdbId) : null,
+            };
+            if (document.getElementById('movie-seq-name').value) data.sequence_name = document.getElementById('movie-seq-name').value;
+            if (document.getElementById('movie-seq-order').value) data.sequence_order = document.getElementById('movie-seq-order').value;
+            if (editMode.active && editMode.type === 'movie') {
+                await sb.from('movies').update(data).eq('id', editMode.id);
+                alert('Updated!');
+            } else {
+                const {
+                    error
+                } = await sb.from('movies').insert(data);
+                if (error) return alert('Error: ' + error.message);
+                if (currentRequestKey) await sb.from('requests').delete().eq('id', currentRequestKey);
+                alert('Added!');
+            }
+            resetMovieForm();
+            await fetchMovies();
+            loadLibraryChunk(true);
+        });
+
+        // --- SERIES LOGIC & BULK TOOLS ---
+        function resetSeriesForm(keepRequest = false) {
+            document.getElementById('series-form').reset();
+            document.getElementById('seasons-container').innerHTML = '';
+            editMode = {
+                active: false
+            };
+            currentImportedCast = [];
+            currentTmdbId = null;
+            if (!keepRequest) currentRequestKey = null;
+            document.getElementById('series-submit-btn').innerText = "Save Series";
+            document.getElementById('series-form-title').innerText = "Add TV Series Manually";
+            document.getElementById('bulk-tool-panel').classList.add('hidden');
+            localStorage.removeItem('autosave_series'); // Clear draft
+        }
+
+        function toggleBulkPanel() {
+            const p = document.getElementById('bulk-tool-panel');
+            p.classList.toggle('hidden');
+            if (!p.classList.contains('hidden')) updateBulkSeasonSelect();
+        }
+
+        function updateBulkSeasonSelect() {
+            const select = document.getElementById('bulk-target-season');
+            select.innerHTML = '<option value="">Select Target Season...</option>';
+            const seasons = document.querySelectorAll('.season-block');
+            seasons.forEach((block, index) => {
+                const name = block.querySelector('.season-name').value;
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = name;
+                select.appendChild(opt);
+            });
+        }
+
+        // --- UPDATED BULK LINKS LOGIC WITH TOGGLE ---
+        function applyBulkLinks() {
+            const rawText = document.getElementById('bulk-urls-input').value;
+            let lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== '');
+            const seasonIndex = document.getElementById('bulk-target-season').value;
+            const sortMode = document.getElementById('bulk-sort-mode').value;
+            const customMapStr = document.getElementById('bulk-custom-map').value;
+
+            // Series Toggle Check
+            const doConvert = document.getElementById('bulk-convert-toggle').checked;
+
+            if (lines.length === 0) return alert("Please paste some links.");
+            if (seasonIndex === "") return alert("Please select a target season.");
+
+            const seasonBlocks = document.querySelectorAll('.season-block');
+            const targetBlock = seasonBlocks[seasonIndex];
+            if (!targetBlock) return alert("Season not found.");
+
+            const episodes = targetBlock.querySelectorAll('.episode-row');
+
+            if (sortMode === 'az') {
+                lines.sort((a, b) => a.localeCompare(b));
+            } else if (sortMode === 'za') {
+                // CHANGED: Simply reverse the array of lines (Last link becomes first)
+                lines.reverse();
+            }
+
+            // Helper function to process URL
+            const processUrl = (url) => {
+                if (doConvert && url.includes('/file/')) {
+                    return url.replace('/file/', '/embed/');
+                }
+                return url;
+            };
+
+            if (sortMode === 'custom') {
+                const map = customMapStr.split(/[\s,]+/).filter(s => s.trim() !== '').map(n => parseInt(n));
+                lines.forEach((rawUrl, i) => {
+                    if (i < map.length) {
+                        const targetEpNum = map[i];
+                        if (targetEpNum > 0 && targetEpNum <= episodes.length) {
+                            const epRow = episodes[targetEpNum - 1];
+                            setEpisodeServerUrl(epRow, processUrl(rawUrl));
+                        }
+                    }
+                });
+            } else {
+                lines.forEach((rawUrl, i) => {
+                    if (i < episodes.length) {
+                        setEpisodeServerUrl(episodes[i], processUrl(rawUrl));
+                    }
+                });
+            }
+            alert("Links Applied!");
+            document.getElementById('bulk-urls-input').value = '';
+        }
+
+        function loadFullFranchise() {
+            const raw = document.getElementById('bulk-urls-input').value;
+            const lines = raw.split('\n');
+            const regex = /S(\d+):E(\d+):\s*(https?:\/\/[^\s]+)/i;
+            let count = 0;
+
+            lines.forEach(line => {
+                const match = line.match(regex);
+                if (match) {
+                    const sNum = parseInt(match[1]);
+                    const eNum = parseInt(match[2]);
+                    const url = match[3];
+
+                    // Find Season Block
+                    let seasonBlock = null;
+                    const seasons = document.querySelectorAll('.season-block');
+                    seasons.forEach(s => {
+                        const sName = s.querySelector('.season-name').value;
+                        if (sName.toLowerCase().includes(`season ${sNum}`) || sName === sNum.toString()) {
+                            seasonBlock = s;
+                        }
+                    });
+
+                    // Create Season if missing
+                    if (!seasonBlock) {
+                        addSeasonUI({
+                            name: `Season ${sNum}`,
+                            episodes: []
+                        });
+                        const newSeasons = document.querySelectorAll('.season-block');
+                        seasonBlock = newSeasons[newSeasons.length - 1];
+                    }
+
+                    // Find Episode Block
+                    let epRow = null;
+                    const episodes = seasonBlock.querySelectorAll('.episode-row');
+                    if (eNum <= episodes.length) {
+                        epRow = episodes[eNum - 1];
+                    } else {
+                        const epContainer = seasonBlock.querySelector('.episodes-container');
+                        for (let i = episodes.length + 1; i <= eNum; i++) {
+                            addEpisodeUI(null, epContainer, {
+                                title: `Episode ${i}`,
+                                servers: [],
+                                downloadLink: ''
+                            });
+                        }
+                        epRow = seasonBlock.querySelectorAll('.episode-row')[eNum - 1];
+                    }
+
+                    // Set URL
+                    if (epRow) {
+                        const serverList = epRow.querySelector('.ep-servers-list');
+                        let serverRow = serverList.querySelector('.ep-server-row');
+                        if (!serverRow) {
+                            addEpisodeServerRow(serverList, {
+                                name: 'Server 1',
+                                url: ''
+                            });
+                            serverRow = serverList.querySelector('.ep-server-row');
+                        }
+                        const urlInput = serverRow.querySelector('.ep-srv-url');
+                        urlInput.value = url;
+                        count++;
+                    }
+                }
+            });
+            alert(`Processed ${count} links via Franchise Mode ☠️`);
+        }
+
+        function setEpisodeServerUrl(epRow, url) {
+            const list = epRow.querySelector('.ep-servers-list');
+            let serverRow = list.querySelector('.ep-server-row');
+            if (!serverRow) {
+                addEpisodeServerRow(list, {
+                    name: 'Server 1',
+                    url: ''
+                });
+                serverRow = list.querySelector('.ep-server-row');
+            }
+            const urlInput = serverRow.querySelector('.ep-srv-url');
+            if (urlInput) urlInput.value = url;
+        }
+
+        function addSeasonUI(d) {
+            const c = document.getElementById('seasons-container');
+            const div = document.createElement('div');
+            div.className = "bg-highlight/5 border border-white/5 rounded p-2 season-block";
+            const seasonNum = c.children.length + 1;
+
+            div.innerHTML = `
+                <div class="flex gap-2 mb-2 items-center">
+                    <i class="ri-folder-open-fill text-gray-500"></i>
+                    <input type="text" class="season-name bg-transparent text-white text-xs font-bold flex-1 outline-none focus:text-brand" value="${d ? d.name : 'Season ' + seasonNum}">
+                    <button type="button" onclick="addEpisodeUI(this)" class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300 hover:text-white hover:bg-brand transition">+ Episode</button>
+                    <button type="button" onclick="this.closest('.season-block').remove()" class="text-red-500 text-[10px] hover:text-white"><i class="ri-delete-bin-line"></i></button>
+                </div>
+                <div class="episodes-container space-y-1 pl-1 border-l border-white/10"></div>
+            `;
+            c.appendChild(div);
+
+            if (d && d.episodes) {
+                const ec = div.querySelector('.episodes-container');
+                d.episodes.forEach(e => addEpisodeUI(null, ec, e));
+            }
+        }
+
+        function addEpisodeUI(btn, containerOverride, d) {
+            const c = containerOverride || btn.closest('.season-block').querySelector('.episodes-container');
+            const div = document.createElement('div');
+            div.className = "episode-row bg-black/40 p-2 rounded flex flex-col gap-1 border border-white/5";
+            const episodeNum = c.children.length + 1;
+
+            div.innerHTML = `
+                <div class="flex justify-between items-center gap-2">
+                    <span class="text-[10px] text-gray-500 font-mono">EP${episodeNum}</span>
+                    <input type="text" class="ep-title bg-transparent text-white text-xs w-full outline-none font-bold placeholder-gray-600 focus:text-brand" value="${d ? d.title : 'Episode ' + episodeNum}">
+                    <button type="button" onclick="this.closest('.episode-row').remove()" class="text-red-900 hover:text-red-500 text-xs"><i class="ri-close-fill"></i></button>
+                </div>
+                
+                <div class="ep-servers-list space-y-1"></div>
+                
+                <div class="flex gap-2">
+                    <input type="text" class="ep-dl bg-transparent text-gray-500 text-[10px] w-full outline-none border-b border-white/5 focus:border-brand" placeholder="Download Link (Opt)" value="${d && d.downloadLink ? d.downloadLink : ''}">
+                    <button type="button" onclick="addEpisodeServerRow(this.closest('.episode-row').querySelector('.ep-servers-list'))" class="text-[10px] text-blue-500 hover:text-white whitespace-nowrap">+ Srv</button>
+                </div>
+            `;
+            c.appendChild(div);
+
+            const serverList = div.querySelector('.ep-servers-list');
+            if (d && d.servers && d.servers.length > 0) d.servers.forEach(srv => addEpisodeServerRow(serverList, srv));
+            else if (d && d.link) addEpisodeServerRow(serverList, {
+                name: "Server 1",
+                url: d.link
+            });
+            else addEpisodeServerRow(serverList, {
+                name: "Server 1",
+                url: ""
+            });
+        }
+
+        function addEpisodeServerRow(container, data = null) {
+            const div = document.createElement('div');
+            div.className = "flex gap-1 items-center ep-server-row";
+            const currentCount = container.querySelectorAll('.ep-server-row').length;
+
+            div.innerHTML = `
+                <input type="text" class="ep-srv-name bg-white/5 text-gray-300 text-[10px] rounded px-1 py-0.5 w-16 outline-none focus:text-white focus:bg-white/10" placeholder="Srv Name" value="${data ? data.name : 'Srv '+(currentCount+1)}">
+                <input type="text" class="ep-srv-url bg-white/5 text-blue-400 text-[10px] rounded px-1 py-0.5 flex-1 outline-none focus:bg-white/10" placeholder="URL" value="${data ? data.url : ''}">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-500/50 hover:text-red-500 text-[10px]"><i class="ri-close-line"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function editSeries(id) {
+            showAdminPage('series');
+            const {
+                data: v
+            } = await sb.from('series').select('*').eq('id', id).single();
+            if (v) {
+                document.getElementById('series-title').value = v.title;
+                document.getElementById('series-genre').value = v.genre;
+                document.getElementById('series-status').value = v.status;
+                document.getElementById('series-year').value = v.year;
+                document.getElementById('series-poster').value = v.poster;
+                document.getElementById('series-thumbnail').value = v.thumbnail;
+                document.getElementById('series-description').value = v.description;
+                document.getElementById('seasons-container').innerHTML = '';
+                if (v.seasons) v.seasons.forEach(s => addSeasonUI(s));
+                currentImportedCast = v.cast_data || [];
+                currentTmdbId = v.tmdb_id || null;
+                editMode = {
+                    active: true,
+                    id: id,
+                    type: 'series'
+                };
+                document.getElementById('series-submit-btn').innerText = "Update Series";
+                document.getElementById('series-form-title').innerText = "Editing: " + v.title;
+                document.getElementById('series-form').scrollIntoView();
+                updateBulkSeasonSelect();
+            }
+        }
+
+        document.getElementById('series-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const seasons = [];
+            document.querySelectorAll('.season-block').forEach(b => {
+                const name = b.querySelector('.season-name').value;
+                const eps = [];
+                b.querySelectorAll('.episode-row').forEach(r => {
+                    const servers = [];
+                    r.querySelectorAll('.ep-server-row').forEach(sr => {
+                        const sName = sr.querySelector('.ep-srv-name').value.trim();
+                        const sUrl = sr.querySelector('.ep-srv-url').value.trim();
+                        if (sUrl) servers.push({
+                            name: sName || "Server",
+                            url: sUrl
+                        });
+                    });
+                    eps.push({
+                        title: r.querySelector('.ep-title').value,
+                        servers: servers,
+                        downloadLink: r.querySelector('.ep-dl').value
+                    });
+                });
+                if (eps.length > 0) seasons.push({
+                    name: name,
+                    episodes: eps
+                });
+            });
+            const data = {
+                title: document.getElementById('series-title').value,
+                genre: document.getElementById('series-genre').value,
+                status: document.getElementById('series-status').value,
+                year: document.getElementById('series-year').value,
+                poster: document.getElementById('series-poster').value,
+                thumbnail: document.getElementById('series-thumbnail').value,
+                description: document.getElementById('series-description').value,
+                cast_data: currentImportedCast,
+                seasons: seasons,
+                tmdb_id: currentTmdbId ? String(currentTmdbId) : null,
+            };
+            if (editMode.active && editMode.type === 'series') {
+                await sb.from('series').update(data).eq('id', editMode.id);
+                alert('Updated!');
+            } else {
+                const {
+                    error
+                } = await sb.from('series').insert(data);
+                if (error) return alert('Error: ' + error.message);
+                if (currentRequestKey) await sb.from('requests').delete().eq('id', currentRequestKey);
+                alert('Added!');
+            }
+            resetSeriesForm();
+            await fetchSeries();
+            loadLibraryChunk(true);
+        });
+
+        // --- NEW FEATURE: AUTO-SAVE FORMS ---
+        function setupAutoSave(formId, storageKey) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+            // Restore from storage if not in edit mode
+            const saved = localStorage.getItem(storageKey);
+            if (saved && !editMode.active) {
+                try {
+                    const data = JSON.parse(saved);
+                    Object.keys(data).forEach(k => {
+                        const el = document.getElementById(k);
+                        if (el) el.value = data[k];
+                    });
+                } catch (e) {}
+            }
+            // Save on input
+            form.addEventListener('input', (e) => {
+                if (editMode.active) return;
+                const data = {};
+                form.querySelectorAll('input, textarea, select').forEach(el => {
+                    if (el.id) data[el.id] = el.value;
+                });
+                localStorage.setItem(storageKey, JSON.stringify(data));
+            });
+        }
+        setupAutoSave('movie-form', 'autosave_movie');
+        setupAutoSave('series-form', 'autosave_series');
+    </script>
+</body>
+
+</html>
